@@ -29,13 +29,42 @@
 
     <main class="app-main">
         <section class="view" id="view-ingredients">
-            <p class="placeholder">Ingredients will live here. (Slice 1)</p>
+            <div class="toolbar">
+                <button type="button" class="primary-btn" id="add-ingredient-btn">+ Add ingredient</button>
+            </div>
+            <p class="load-error" id="ingredients-error" hidden></p>
+            <div id="ingredient-sections"></div>
         </section>
 
         <section class="view" id="view-recipes" hidden>
             <p class="placeholder">Recipes will live here. (Slice 4)</p>
         </section>
     </main>
+
+    <dialog class="dialog" id="ingredient-dialog">
+        <form id="ingredient-form" novalidate>
+            <h2 id="ingredient-dialog-title">Add ingredient</h2>
+
+            <label class="field">
+                <span class="field-label">Name</span>
+                <input type="text" id="ingredient-name" maxlength="80" autocomplete="off" required>
+            </label>
+
+            <fieldset class="field">
+                <legend class="field-label">Categories</legend>
+                <div class="chips" id="ingredient-categories"></div>
+            </fieldset>
+
+            <p class="form-error" id="ingredient-error" hidden></p>
+
+            <div class="dialog-actions">
+                <button type="button" class="danger-btn" id="ingredient-delete" hidden>Delete</button>
+                <span class="spacer"></span>
+                <button type="button" class="secondary-btn" id="ingredient-cancel">Cancel</button>
+                <button type="submit" class="primary-btn" id="ingredient-save">Save</button>
+            </div>
+        </form>
+    </dialog>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>

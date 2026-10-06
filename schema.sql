@@ -19,6 +19,10 @@ CREATE TABLE IF NOT EXISTS ingredients (
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Ingredient names are unique, ignoring case ("Salmon" == "salmon").
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ingredients_name
+    ON ingredients (name COLLATE NOCASE);
+
 -- An ingredient can belong to several categories.
 CREATE TABLE IF NOT EXISTS ingredient_categories (
     ingredient_id INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,

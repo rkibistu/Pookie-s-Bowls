@@ -4,6 +4,8 @@ import os
 import sqlite3
 from pathlib import Path
 
+from flask import g
+
 DB_PATH = os.environ.get("DB_PATH", "/data/pookie.db")
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
@@ -25,6 +27,20 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+def get_db():
+    """Return this request's connection, opening it on first use."""
+    if "db" not in g:
+        g.db = get_connection()
+    return g.db
+
+
+def close_db(exc=None):
+    """Close the request's connection, if one was opened."""
+    conn = g.pop("db", None)
+    if conn is not None:
+        conn.close()
 
 
 def init_db():
