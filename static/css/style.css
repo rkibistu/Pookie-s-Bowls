@@ -1,0 +1,150 @@
+/* ---- Theme variables -------------------------------------------------- */
+:root {
+    --bg: #fff7f2;
+    --surface: #ffffff;
+    --text: #2f2a33;
+    --muted: #8a8591;
+    --border: #efe6df;
+    --shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+    --radius: 16px;
+
+    /* Overridden per identity below. */
+    --accent: #14b8a6;
+    --accent-soft: #d6f5f0;
+    --accent-ink: #0b6e64;
+}
+
+/* "Me" theme — purple/violet. */
+html[data-identity="me"] {
+    --bg: #f5f3ff;
+    --accent: #8b5cf6;
+    --accent-soft: #ede9fe;
+    --accent-ink: #5b21b6;
+}
+
+/* "Her" theme — fresh green. */
+html[data-identity="her"] {
+    --bg: #f0fdf4;
+    --accent: #22c55e;
+    --accent-soft: #dcfce7;
+    --accent-ink: #166534;
+}
+
+/* ---- Base ------------------------------------------------------------- */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    transition: background 0.3s ease;
+    min-height: 100vh;
+}
+
+/* ---- Header ----------------------------------------------------------- */
+.app-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.brand-emoji {
+    font-size: 1.8rem;
+}
+
+.brand h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: var(--accent-ink);
+}
+
+.identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.identity-label {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.identity-toggle {
+    display: flex;
+    background: var(--accent-soft);
+    border-radius: 999px;
+    padding: 4px;
+    gap: 4px;
+}
+
+.identity-btn {
+    border: none;
+    background: transparent;
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--accent-ink);
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.identity-btn.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+}
+
+/* ---- Nav -------------------------------------------------------------- */
+.app-nav {
+    display: flex;
+    gap: 10px;
+    padding: 16px 20px 0;
+}
+
+.nav-btn {
+    border: 2px solid transparent;
+    background: var(--surface);
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text);
+    box-shadow: var(--shadow);
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.nav-btn.active {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+
+/* ---- Main ------------------------------------------------------------- */
+.app-main {
+    padding: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.placeholder {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+    text-align: center;
+    color: var(--muted);
+}

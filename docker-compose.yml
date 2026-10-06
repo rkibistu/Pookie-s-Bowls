@@ -1,0 +1,14 @@
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persist the SQLite database across container rebuilds/restarts.
+      - ./data:/data
+      # Mount the source for live reload during development.
+      - .:/app
+    environment:
+      - DB_PATH=/data/pookie.db
+      - FLASK_DEBUG=1
+    restart: unless-stopped

@@ -7,11 +7,14 @@ network.
 - **Backend:** Python + Flask (lightweight; `sqlite3` is in the standard library).
 - **Database:** SQLite (single file, trivial to back up).
 - **Frontend:** plain HTML + CSS + vanilla JS, served by Flask. No build step, no framework.
+- **Containerized:** everything runs in Docker — nothing installed on the host beyond Docker
+  itself. A `Dockerfile` builds the Flask app image; `docker compose up` starts it. The SQLite
+  file lives on a mounted volume so data survives container rebuilds/restarts.
 - **Identity:** no login. A "Who are you?" toggle (You / Her) remembered per device in
   `localStorage`. Selecting one switches the color theme and tags which person's
   love/like/hate is being set.
 - **Hosting:** runs on an always-on laptop on the local network; both phones reach it at
-  `http://<laptop-ip>:5000`. Started manually (`python app.py`).
+  `http://<laptop-ip>:5000`. Started with `docker compose up` (optionally `-d`).
 
 ## Data model
 - **`ingredients`** — base ingredients only (salmon, rice, cucumber…). No sauces here.
@@ -44,14 +47,19 @@ network.
 Each slice is a full backend-to-frontend path that can be opened in the browser and fully
 exercised before moving on. Build in order 0 → 6.
 
-### Slice 0 — Skeleton & Identity
-**Goal:** a running Flask app, openable on both phones, with the "who am I" identity + theme.
+### Slice 0 — Skeleton, Docker & Identity
+**Goal:** a containerized Flask app, started with one command and openable on both phones,
+with the "who am I" identity + theme.
+- **Infra:** `Dockerfile` (Python base image, installs Flask from `requirements.txt`, runs the
+  app) and `docker-compose.yml` (maps port 5000, mounts a volume for the SQLite file so data
+  persists). `docker compose up` is the only command needed; nothing else installed on the host.
 - **Backend:** Flask app serving static HTML/CSS/JS; creates the empty SQLite DB with the
   full schema on first run; seeds the fixed categories.
 - **Frontend:** app shell with nav (Ingredients / Recipes), a "Who are you?" toggle
   (You / Her) saved in `localStorage`, and a color theme that switches with the selection.
-- **Test from frontend:** open `http://<laptop-ip>:5000`, toggle identity → whole UI
-  recolors; reload → remembers who you are; reachable from both phones.
+- **Test from frontend:** run `docker compose up`, open `http://<laptop-ip>:5000`, toggle
+  identity → whole UI recolors; reload → remembers who you are; reachable from both phones;
+  stop/rebuild the container → data is still there.
 
 ### Slice 1 — Ingredient catalog
 **Goal:** add ingredients and see them grouped by category.

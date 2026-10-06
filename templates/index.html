@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" data-identity="me">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pookie's Bowls 🥗</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="app-header">
+        <div class="brand">
+            <span class="brand-emoji">🥗</span>
+            <h1>Pookie's Bowls</h1>
+        </div>
+
+        <div class="identity" id="identity">
+            <span class="identity-label">Who are you?</span>
+            <div class="identity-toggle">
+                <button type="button" class="identity-btn" data-who="me">😎 Me</button>
+                <button type="button" class="identity-btn" data-who="her">🌸 Her</button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="app-nav">
+        <button type="button" class="nav-btn" data-view="ingredients">🥑 Ingredients</button>
+        <button type="button" class="nav-btn" data-view="recipes">📖 Recipes</button>
+    </nav>
+
+    <main class="app-main">
+        <section class="view" id="view-ingredients">
+            <p class="placeholder">Ingredients will live here. (Slice 1)</p>
+        </section>
+
+        <section class="view" id="view-recipes" hidden>
+            <p class="placeholder">Recipes will live here. (Slice 4)</p>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
