@@ -205,7 +205,9 @@ body {
 /* ---- Ingredients ------------------------------------------------------ */
 .toolbar {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
+    gap: 12px;
     margin-bottom: 16px;
 }
 
@@ -424,6 +426,14 @@ body {
     filter: none;
 }
 
+.fav-hint {
+    display: none;
+    flex: 1;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
 /* Mouse/trackpad: the toggle only appears while hovering (or focusing) the row. */
 @media (hover: hover) {
     .fav-btn {
@@ -433,5 +443,24 @@ body {
     .ingredient-row:hover .fav-btn,
     .ingredient-row:focus-within .fav-btn {
         visibility: visible;
+    }
+}
+
+/* Touch screens: no toggle at all; double-tap the row instead (see app.js). */
+@media (hover: none) {
+    .fav-btn {
+        display: none;
+    }
+
+    .fav-hint {
+        display: block;
+    }
+
+    .ingredient-row {
+        /* No double-tap zoom or text selection getting in the way. */
+        touch-action: manipulation;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-tap-highlight-color: transparent;
     }
 }

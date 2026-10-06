@@ -75,7 +75,8 @@ with the "who am I" identity + theme.
 - **Backend:** `favorites` table (person, ingredient-or-sauce FK); add/remove endpoints.
 - **Frontend:** no icons by default; a heart (💜 me, 💚 her) appears next to the name only
   once that person favorites it. A toggle next to the edit button adds/removes the
-  *current* identity's heart — shown on hover with a mouse, always shown (faded) on phones.
+  *current* identity's heart — shown on hover with a mouse. On phones there is no toggle:
+  double-tap the ingredient instead.
 - **Test from frontend:** as You, favorite Salmon → 💜 appears; switch to Her, favorite it →
   💚 appears too; reload → both persist; remove yours → only 💚 remains.
 

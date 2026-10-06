@@ -15,6 +15,8 @@ function setIdentity(who) {
     btn.classList.toggle("active", btn.dataset.who === who);
   });
   // The favorite toggles act for the current identity, so redraw them.
+  document.getElementById("fav-hint").textContent =
+    `Double-tap to ${HEARTS[who]}`;
   renderIngredients();
 }
 
@@ -101,11 +103,29 @@ function renderIngredients() {
           renderFavoriteToggle(ingredient),
           edit,
         );
+        row.addEventListener("click", (event) => handleRowTap(event, row, ingredient));
         list.append(row);
       }
       card.append(list);
     }
     container.append(card);
+  }
+}
+
+// Touch screens have no hover, so the toggle is hidden there and a double-tap
+// on the row adds/removes the current identity's heart instead.
+const touchOnly = window.matchMedia("(hover: none)");
+const DOUBLE_TAP_MS = 350;
+let lastTap = null; // {row, time} of the previous tap
+
+function handleRowTap(event, row, ingredient) {
+  if (!touchOnly.matches || event.target.closest("button")) return;
+  const now = Date.now();
+  if (lastTap && lastTap.row === row && now - lastTap.time < DOUBLE_TAP_MS) {
+    lastTap = null;
+    toggleFavorite(ingredient, ingredient.favorites.includes(currentIdentity()));
+  } else {
+    lastTap = { row, time: now };
   }
 }
 
