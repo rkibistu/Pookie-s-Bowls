@@ -120,12 +120,25 @@ def list_ingredients():
     ):
         links.setdefault(r["ingredient_id"], []).append(r["category_id"])
 
+    # Who has favorited each ingredient, "me" before "her".
+    favorites = {}
+    for r in conn.execute(
+        "SELECT ingredient_id, person FROM favorites "
+        "WHERE ingredient_id IS NOT NULL ORDER BY person DESC"
+    ):
+        favorites.setdefault(r["ingredient_id"], []).append(r["person"])
+
     by_category = {c["id"]: c for c in categories}
     for r in conn.execute(
         "SELECT id, name FROM ingredients ORDER BY name COLLATE NOCASE"
     ):
         category_ids = links.get(r["id"], [])
-        ingredient = {"id": r["id"], "name": r["name"], "category_ids": category_ids}
+        ingredient = {
+            "id": r["id"],
+            "name": r["name"],
+            "category_ids": category_ids,
+            "favorites": favorites.get(r["id"], []),
+        }
         for category_id in category_ids:
             by_category[category_id]["ingredients"].append(ingredient)
 
@@ -168,6 +181,42 @@ def delete_ingredient(ingredient_id):
         cur = conn.execute("DELETE FROM ingredients WHERE id = ?", (ingredient_id,))
     if cur.rowcount == 0:
         raise ApiError("Ingredient not found.", 404)
+    return "", 204
+
+
+# ---- Favorites -----------------------------------------------------------
+
+PEOPLE = ("me", "her")
+
+
+def _check_person(person):
+    if person not in PEOPLE:
+        raise ApiError("person must be 'me' or 'her'.")
+
+
+@app.put("/api/ingredients/<int:ingredient_id>/favorites/<person>")
+def add_favorite(ingredient_id, person):
+    _check_person(person)
+    conn = db.get_db()
+    _get_ingredient(conn, ingredient_id)  # 404 if missing
+    with conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO favorites (person, ingredient_id) VALUES (?, ?)",
+            (person, ingredient_id),
+        )
+    return "", 204
+
+
+@app.delete("/api/ingredients/<int:ingredient_id>/favorites/<person>")
+def remove_favorite(ingredient_id, person):
+    _check_person(person)
+    conn = db.get_db()
+    _get_ingredient(conn, ingredient_id)  # 404 if missing
+    with conn:
+        conn.execute(
+            "DELETE FROM favorites WHERE person = ? AND ingredient_id = ?",
+            (person, ingredient_id),
+        )
     return "", 204
 
 

@@ -385,3 +385,53 @@ body {
 .dialog-actions button {
     padding: 10px 14px;
 }
+
+/* ---- Favorites -------------------------------------------------------- */
+.ingredient-label {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.fav-badges {
+    display: inline-flex;
+    gap: 2px;
+    font-size: 0.95rem;
+}
+
+.fav-badge.pop {
+    animation: fav-pop 0.35s ease-out;
+}
+
+@keyframes fav-pop {
+    0% { transform: scale(0.4); }
+    60% { transform: scale(1.35); }
+    100% { transform: scale(1); }
+}
+
+/* Not yet a favorite: a faded heart in the current identity's color. */
+.fav-btn:not(.is-favorite) {
+    opacity: 0.35;
+    filter: grayscale(0.3);
+}
+
+.fav-btn:not(.is-favorite):hover,
+.fav-btn:not(.is-favorite):focus-visible {
+    opacity: 1;
+    filter: none;
+}
+
+/* Mouse/trackpad: the toggle only appears while hovering (or focusing) the row. */
+@media (hover: hover) {
+    .fav-btn {
+        visibility: hidden;
+    }
+
+    .ingredient-row:hover .fav-btn,
+    .ingredient-row:focus-within .fav-btn {
+        visibility: visible;
+    }
+}

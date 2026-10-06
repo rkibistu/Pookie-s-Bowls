@@ -50,11 +50,11 @@ CREATE TABLE IF NOT EXISTS recipe_components (
     CHECK ((ingredient_id IS NOT NULL) + (sauce_recipe_id IS NOT NULL) = 1)
 );
 
--- Per-person love/like/hate on EITHER an ingredient OR a sauce.
-CREATE TABLE IF NOT EXISTS preferences (
+-- Per-person favorites (💜 me / 💚 her) on EITHER an ingredient OR a sauce.
+-- A row exists only while the item is favorited.
+CREATE TABLE IF NOT EXISTS favorites (
     id              INTEGER PRIMARY KEY,
     person          TEXT    NOT NULL CHECK (person IN ('me', 'her')),
-    state           TEXT    NOT NULL CHECK (state IN ('love', 'like', 'hate')),
     ingredient_id   INTEGER          REFERENCES ingredients(id) ON DELETE CASCADE,
     sauce_recipe_id INTEGER          REFERENCES recipes(id)     ON DELETE CASCADE,
     CHECK ((ingredient_id IS NOT NULL) + (sauce_recipe_id IS NOT NULL) = 1),

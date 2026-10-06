@@ -11,8 +11,8 @@ network.
   itself. A `Dockerfile` builds the Flask app image; `docker compose up` starts it. The SQLite
   file lives on a mounted volume so data survives container rebuilds/restarts.
 - **Identity:** no login. A "Who are you?" toggle (You / Her) remembered per device in
-  `localStorage`. Selecting one switches the color theme and tags which person's
-  love/like/hate is being set.
+  `localStorage`. Selecting one switches the color theme and decides whose
+  favorite heart (💜 me / 💚 her) is being set.
 - **Hosting:** runs on an always-on laptop on the local network; both phones reach it at
   `http://<laptop-ip>:5000`. Started with `docker compose up` (optionally `-d`).
 
@@ -29,14 +29,14 @@ network.
 - **`recipe_components`** — contents of a recipe. Each row points to *either* an ingredient
   *or* a sauce (two nullable foreign keys). Lets a bowl contain ingredients and sauces, and
   a sauce contain its ingredients.
-- **`preferences`** — person (me/her) + state (love/like/hate), pointing to *either* an
-  ingredient *or* a sauce (same two-nullable-FK pattern).
+- **`favorites`** — person (me/her), pointing to *either* an ingredient *or* a sauce (same
+  two-nullable-FK pattern). A row exists only while the item is favorited.
 
 ### Key design decisions
 - A sauce is **not** an ingredient in the DB — it is a recipe. It is *displayed* in the
   ingredient list because, conceptually, it is a building block for a bowl.
 - Sauces appear in **both** the ingredient list and the Recipes page.
-- Love/like/hate applies to both ingredients and sauces.
+- Favorites apply to both ingredients and sauces.
 - The full SQLite schema (including the two-nullable-FK pattern) is created up front so later
   slices add features without reworking tables.
 
@@ -70,14 +70,14 @@ with the "who am I" identity + theme.
 - **Test from frontend:** add "Salmon" as protein, "Avocado" as fresh + topping → appears
   under both sections; edit/delete works; reload persists.
 
-### Slice 2 — Preferences (love / like / hate)
-**Goal:** mark each person's feelings on an ingredient.
-- **Backend:** `preferences` table (person, state, ingredient-or-sauce FK); set/clear
-  endpoints.
-- **Frontend:** two icon sets per entry (you + her), 3 states each; tapping sets the state
-  for the *current* identity; visual styling tied to the theme.
-- **Test from frontend:** as You, set Salmon = love; switch to Her, set Salmon = hate;
-  reload → both persist and display correctly.
+### Slice 2 — Favorites (💜 me / 💚 her)
+**Goal:** each person can mark ingredients as a favorite.
+- **Backend:** `favorites` table (person, ingredient-or-sauce FK); add/remove endpoints.
+- **Frontend:** no icons by default; a heart (💜 me, 💚 her) appears next to the name only
+  once that person favorites it. A toggle next to the edit button adds/removes the
+  *current* identity's heart — shown on hover with a mouse, always shown (faded) on phones.
+- **Test from frontend:** as You, favorite Salmon → 💜 appears; switch to Her, favorite it →
+  💚 appears too; reload → both persist; remove yours → only 💚 remains.
 
 ### Slice 3 — Create Bowl
 **Goal:** build and save a manual recipe by selecting ingredients.
@@ -97,10 +97,10 @@ with the "who am I" identity + theme.
 
 ### Slice 5 — Sauces
 **Goal:** sauces as recipes that also live in the ingredient list.
-- **Backend:** `recipes` (kind=`sauce`); reuse components/preferences FKs.
+- **Backend:** `recipes` (kind=`sauce`); reuse components/favorites FKs.
 - **Frontend:** "Sauces" section in the Ingredients page populated from sauce recipes;
-  create/edit a sauce (ingredients + notes); sauces are selectable into bowls and support
-  love/like/hate; sauces also appear on the Recipes page.
+  create/edit a sauce (ingredients + notes); sauces are selectable into bowls and can be
+  favorited; sauces also appear on the Recipes page.
 - **Test from frontend:** create a "Spicy Mayo" sauce, see it in the Sauces section, favorite
   it, include it in a bowl, and read its recipe from the Recipes page.
 

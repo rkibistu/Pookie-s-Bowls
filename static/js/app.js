@@ -4,6 +4,9 @@
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
 const VIEW_KEY = "pookie-view"; // "ingredients" | "recipes"
 
+// Each person's favorite heart.
+const HEARTS = { me: "💜", her: "💚" };
+
 /** Apply the chosen identity: drives the color theme and button state. */
 function setIdentity(who) {
   document.documentElement.dataset.identity = who;
@@ -11,6 +14,12 @@ function setIdentity(who) {
   document.querySelectorAll(".identity-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.who === who);
   });
+  // The favorite toggles act for the current identity, so redraw them.
+  renderIngredients();
+}
+
+function currentIdentity() {
+  return document.documentElement.dataset.identity;
 }
 
 /** Show one view and highlight its nav button. */
@@ -87,12 +96,67 @@ function renderIngredients() {
         edit.title = `Edit ${ingredient.name}`;
         edit.setAttribute("aria-label", `Edit ${ingredient.name}`);
         edit.addEventListener("click", () => openIngredientDialog(ingredient));
-        row.append(el("span", "ingredient-name", ingredient.name), edit);
+        row.append(
+          renderIngredientLabel(ingredient),
+          renderFavoriteToggle(ingredient),
+          edit,
+        );
         list.append(row);
       }
       card.append(list);
     }
     container.append(card);
+  }
+}
+
+let justFavorited = null; // {id, person} of the heart just added, to animate it
+
+/** Name followed by the hearts of whoever favorited it. */
+function renderIngredientLabel(ingredient) {
+  const label = el("span", "ingredient-label");
+  label.append(el("span", "ingredient-name", ingredient.name));
+  if (ingredient.favorites.length) {
+    const badges = el("span", "fav-badges");
+    for (const person of ingredient.favorites) {
+      const heart = el("span", "fav-badge", HEARTS[person]);
+      heart.title = person === "me" ? "Me" : "Her";
+      if (justFavorited && justFavorited.id === ingredient.id && justFavorited.person === person) {
+        heart.classList.add("pop");
+      }
+      badges.append(heart);
+    }
+    label.append(badges);
+  }
+  return label;
+}
+
+/** Add/remove the current identity's heart. */
+function renderFavoriteToggle(ingredient) {
+  const who = currentIdentity();
+  const isFavorite = ingredient.favorites.includes(who);
+  const btn = el("button", "icon-btn fav-btn", isFavorite ? "💔" : HEARTS[who]);
+  btn.type = "button";
+  btn.classList.toggle("is-favorite", isFavorite);
+  btn.setAttribute("aria-pressed", String(isFavorite));
+  const action = isFavorite ? "Remove from favorites" : "Add to favorites";
+  btn.title = action;
+  btn.setAttribute("aria-label", `${action}: ${ingredient.name}`);
+  btn.addEventListener("click", () => toggleFavorite(ingredient, isFavorite));
+  return btn;
+}
+
+async function toggleFavorite(ingredient, isFavorite) {
+  const who = currentIdentity();
+  const errorBox = document.getElementById("ingredients-error");
+  try {
+    await api(isFavorite ? "DELETE" : "PUT", `/api/ingredients/${ingredient.id}/favorites/${who}`);
+    justFavorited = isFavorite ? null : { id: ingredient.id, person: who };
+    await loadIngredients();
+  } catch (err) {
+    errorBox.textContent = `Couldn't update favorite: ${err.message}`;
+    errorBox.hidden = false;
+  } finally {
+    justFavorited = null;
   }
 }
 
