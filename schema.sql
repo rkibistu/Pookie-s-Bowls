@@ -3,8 +3,7 @@
 
 PRAGMA foreign_keys = ON;
 
--- Fixed ingredient categories (seeded on first run). "Sauces" is a UI section
--- backed by recipes(kind='sauce'), not a row here.
+-- Fixed ingredient categories (seeded on first run).
 CREATE TABLE IF NOT EXISTS categories (
     id       INTEGER PRIMARY KEY,
     slug     TEXT    NOT NULL UNIQUE,
@@ -12,7 +11,7 @@ CREATE TABLE IF NOT EXISTS categories (
     position INTEGER NOT NULL DEFAULT 0
 );
 
--- Base ingredients only (no sauces).
+-- Base ingredients only (sauces etc. are recipes).
 CREATE TABLE IF NOT EXISTS ingredients (
     id         INTEGER PRIMARY KEY,
     name       TEXT    NOT NULL,
@@ -30,34 +29,56 @@ CREATE TABLE IF NOT EXISTS ingredient_categories (
     PRIMARY KEY (ingredient_id, category_id)
 );
 
--- All recipes: bowls (manual), external links, and sauces.
+-- Fixed recipe categories (seeded on first run): poke bowl, sauce, soup…
+-- Recipes in a category with in_ingredient_list = 1 (e.g. sauces) are shown
+-- in the ingredient list and can be picked into other recipes.
+CREATE TABLE IF NOT EXISTS recipe_categories (
+    id                 INTEGER PRIMARY KEY,
+    slug               TEXT    NOT NULL UNIQUE,
+    name               TEXT    NOT NULL,
+    emoji              TEXT    NOT NULL,
+    position           INTEGER NOT NULL DEFAULT 0,
+    in_ingredient_list INTEGER NOT NULL DEFAULT 0 CHECK (in_ingredient_list IN (0, 1))
+);
+
+-- All recipes. kind is where the recipe comes from: 'manual' (built from
+-- components) or 'link' (an external URL). What it is lives in its categories.
 CREATE TABLE IF NOT EXISTS recipes (
     id         INTEGER PRIMARY KEY,
     name       TEXT    NOT NULL,
-    kind       TEXT    NOT NULL CHECK (kind IN ('bowl', 'link', 'sauce')),
+    kind       TEXT    NOT NULL CHECK (kind IN ('manual', 'link')),
     url        TEXT,
     notes      TEXT,
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
--- Contents of a recipe. Each row references EITHER an ingredient OR a sauce
--- (a recipe of kind='sauce'), never both and never neither.
-CREATE TABLE IF NOT EXISTS recipe_components (
-    id              INTEGER PRIMARY KEY,
-    recipe_id       INTEGER NOT NULL REFERENCES recipes(id)     ON DELETE CASCADE,
-    ingredient_id   INTEGER          REFERENCES ingredients(id) ON DELETE CASCADE,
-    sauce_recipe_id INTEGER          REFERENCES recipes(id)     ON DELETE CASCADE,
-    CHECK ((ingredient_id IS NOT NULL) + (sauce_recipe_id IS NOT NULL) = 1)
+-- A recipe can belong to several categories.
+CREATE TABLE IF NOT EXISTS recipe_category_links (
+    recipe_id   INTEGER NOT NULL REFERENCES recipes(id)           ON DELETE CASCADE,
+    category_id INTEGER NOT NULL REFERENCES recipe_categories(id) ON DELETE CASCADE,
+    PRIMARY KEY (recipe_id, category_id)
 );
 
--- Per-person favorites (💜 me / 💚 her) on EITHER an ingredient OR a sauce.
+-- Contents of a recipe, in pick order. Each row references EITHER an
+-- ingredient OR another recipe (e.g. a sauce in a bowl), never both and
+-- never neither.
+CREATE TABLE IF NOT EXISTS recipe_components (
+    id                  INTEGER PRIMARY KEY,
+    recipe_id           INTEGER NOT NULL REFERENCES recipes(id)     ON DELETE CASCADE,
+    ingredient_id       INTEGER          REFERENCES ingredients(id) ON DELETE CASCADE,
+    component_recipe_id INTEGER          REFERENCES recipes(id)     ON DELETE CASCADE,
+    CHECK ((ingredient_id IS NOT NULL) + (component_recipe_id IS NOT NULL) = 1),
+    CHECK (component_recipe_id IS NULL OR component_recipe_id <> recipe_id)
+);
+
+-- Per-person favorites (💜 me / 💚 her) on EITHER an ingredient OR a recipe.
 -- A row exists only while the item is favorited.
 CREATE TABLE IF NOT EXISTS favorites (
-    id              INTEGER PRIMARY KEY,
-    person          TEXT    NOT NULL CHECK (person IN ('me', 'her')),
-    ingredient_id   INTEGER          REFERENCES ingredients(id) ON DELETE CASCADE,
-    sauce_recipe_id INTEGER          REFERENCES recipes(id)     ON DELETE CASCADE,
-    CHECK ((ingredient_id IS NOT NULL) + (sauce_recipe_id IS NOT NULL) = 1),
+    id            INTEGER PRIMARY KEY,
+    person        TEXT    NOT NULL CHECK (person IN ('me', 'her')),
+    ingredient_id INTEGER          REFERENCES ingredients(id) ON DELETE CASCADE,
+    recipe_id     INTEGER          REFERENCES recipes(id)     ON DELETE CASCADE,
+    CHECK ((ingredient_id IS NOT NULL) + (recipe_id IS NOT NULL) = 1),
     UNIQUE (person, ingredient_id),
-    UNIQUE (person, sauce_recipe_id)
+    UNIQUE (person, recipe_id)
 );

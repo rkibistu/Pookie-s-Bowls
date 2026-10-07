@@ -31,7 +31,7 @@
         <section class="view" id="view-ingredients">
             <div class="toolbar">
                 <p class="fav-hint" id="fav-hint"></p>
-                <button type="button" class="secondary-btn" id="create-bowl-btn">🥣 Build a Bowl</button>
+                <button type="button" class="secondary-btn" id="new-recipe-btn">🥣 New recipe</button>
                 <button type="button" class="primary-btn" id="add-ingredient-btn">+ Add ingredient</button>
             </div>
             <p class="load-error" id="ingredients-error" hidden></p>
@@ -72,50 +72,55 @@
         </form>
     </dialog>
 
-    <aside class="bowl-tray" id="bowl-tray" aria-label="Your bowl" hidden>
-        <header class="bowl-tray-header">
-            <h2>🥣 Your bowl</h2>
-            <span class="category-count" id="bowl-count">0</span>
+    <aside class="build-tray" id="build-tray" aria-label="Your recipe" hidden>
+        <header class="build-tray-header">
+            <h2>🥣 Your recipe</h2>
+            <span class="category-count" id="build-count">0</span>
         </header>
-        <ul class="bowl-picks" id="bowl-picks"></ul>
-        <div class="bowl-tray-actions">
-            <button type="button" class="secondary-btn" id="bowl-cancel">Cancel</button>
-            <button type="button" class="primary-btn" id="bowl-create" disabled>Create</button>
+        <ul class="build-picks" id="build-picks"></ul>
+        <div class="build-tray-actions">
+            <button type="button" class="secondary-btn" id="build-cancel">Cancel</button>
+            <button type="button" class="primary-btn" id="build-create" disabled>Create</button>
         </div>
     </aside>
 
-    <dialog class="dialog" id="bowl-dialog">
-        <form id="bowl-form" novalidate>
-            <h2>Name your bowl 🥣</h2>
+    <dialog class="dialog" id="build-dialog">
+        <form id="build-form" novalidate>
+            <h2 id="build-dialog-title">Name your recipe ✨</h2>
 
             <label class="field">
                 <span class="field-label">Name</span>
-                <input type="text" id="bowl-name" maxlength="80" autocomplete="off" required>
+                <input type="text" id="build-name" maxlength="80" autocomplete="off" required>
             </label>
+
+            <fieldset class="field">
+                <legend class="field-label">Categories</legend>
+                <div class="chips" id="build-categories"></div>
+            </fieldset>
 
             <label class="field">
                 <span class="field-label">Notes</span>
-                <textarea id="bowl-notes" rows="4" placeholder="Dressing, prep tips, what made it great…"></textarea>
+                <textarea id="build-notes" rows="4" placeholder="How to make it, prep tips, what made it great…"></textarea>
             </label>
 
             <div class="field">
-                <span class="field-label">In this bowl</span>
-                <p class="bowl-summary" id="bowl-summary"></p>
+                <span class="field-label">In this recipe</span>
+                <p class="build-summary" id="build-summary"></p>
             </div>
 
-            <p class="form-error" id="bowl-error" hidden></p>
+            <p class="form-error" id="build-error" hidden></p>
 
             <div class="dialog-actions">
                 <span class="spacer"></span>
-                <button type="button" class="secondary-btn" id="bowl-dialog-cancel">Back</button>
-                <button type="submit" class="primary-btn" id="bowl-save">Save bowl</button>
+                <button type="button" class="secondary-btn" id="build-dialog-cancel">Back</button>
+                <button type="submit" class="primary-btn" id="build-save">Save</button>
             </div>
         </form>
     </dialog>
 
     <dialog class="dialog" id="link-dialog">
         <form id="link-form" novalidate>
-            <h2>Add link recipe 🔗</h2>
+            <h2 id="link-dialog-title">Add link recipe 🔗</h2>
 
             <label class="field">
                 <span class="field-label">Name</span>
@@ -127,6 +132,11 @@
                 <input type="url" id="link-url" inputmode="url" autocomplete="off"
                        placeholder="https://…" required>
             </label>
+
+            <fieldset class="field">
+                <legend class="field-label">Categories</legend>
+                <div class="chips" id="link-categories"></div>
+            </fieldset>
 
             <label class="field">
                 <span class="field-label">Notes</span>
@@ -144,7 +154,7 @@
     </dialog>
 
     <dialog class="dialog" id="recipe-dialog">
-        <span class="recipe-kind" id="recipe-kind"></span>
+        <div class="recipe-badges" id="recipe-badges"></div>
         <h2 id="recipe-title"></h2>
 
         <a class="recipe-link" id="recipe-url" target="_blank" rel="noopener noreferrer" hidden>Open recipe ↗</a>
@@ -164,6 +174,7 @@
         <div class="dialog-actions">
             <button type="button" class="danger-btn" id="recipe-delete">Delete</button>
             <span class="spacer"></span>
+            <button type="button" class="secondary-btn" id="recipe-edit">Edit</button>
             <button type="button" class="secondary-btn" id="recipe-close">Close</button>
         </div>
     </dialog>

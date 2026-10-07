@@ -488,7 +488,7 @@ body {
     border-color: var(--accent);
 }
 
-.bowl-summary {
+.build-summary {
     margin: 0;
     color: var(--text);
 }
@@ -496,7 +496,7 @@ body {
 /* Selection mode: only picking is possible, so hide everything that edits or navigates. */
 body.selecting .app-nav,
 body.selecting #add-ingredient-btn,
-body.selecting #create-bowl-btn,
+body.selecting #new-recipe-btn,
 body.selecting .fav-hint,
 body.selecting .ingredient-row .icon-btn {
     display: none;
@@ -535,7 +535,17 @@ body.selecting .ingredient-row.picked::after {
     color: var(--accent-ink);
 }
 
-.bowl-tray {
+/* The recipe being edited can't go inside itself. */
+body.selecting .ingredient-row.unpickable {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+body.selecting .ingredient-row.unpickable::after {
+    content: "";
+}
+
+.build-tray {
     position: fixed;
     left: 50%;
     bottom: 12px;
@@ -555,20 +565,20 @@ body.selecting .ingredient-row.picked::after {
     to { transform: translate(-50%, 0); opacity: 1; }
 }
 
-.bowl-tray-header {
+.build-tray-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 8px;
 }
 
-.bowl-tray-header h2 {
+.build-tray-header h2 {
     margin: 0;
     font-size: 1.05rem;
     color: var(--accent-ink);
 }
 
-.bowl-picks {
+.build-picks {
     list-style: none;
     margin: 0 0 10px;
     padding: 0;
@@ -579,13 +589,13 @@ body.selecting .ingredient-row.picked::after {
     overflow-y: auto;
 }
 
-.bowl-empty {
+.build-empty {
     color: var(--muted);
     font-style: italic;
     font-size: 0.9rem;
 }
 
-.bowl-pick {
+.build-pick {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -596,7 +606,7 @@ body.selecting .ingredient-row.picked::after {
     font-size: 0.9rem;
 }
 
-.bowl-pick-remove {
+.build-pick-remove {
     border: none;
     background: rgba(255, 255, 255, 0.25);
     color: #fff;
@@ -607,12 +617,12 @@ body.selecting .ingredient-row.picked::after {
     font-size: 0.8rem;
 }
 
-.bowl-pick-remove:hover,
-.bowl-pick-remove:focus-visible {
+.build-pick-remove:hover,
+.build-pick-remove:focus-visible {
     background: rgba(255, 255, 255, 0.45);
 }
 
-.bowl-tray-actions {
+.build-tray-actions {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
@@ -735,9 +745,18 @@ body.selecting .ingredient-row.picked::after {
     overflow: hidden;
 }
 
+.recipe-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+#recipe-badges {
+    margin-bottom: 6px;
+}
+
 .recipe-kind {
     display: inline-block;
-    margin-bottom: 6px;
     padding: 2px 10px;
     border-radius: 999px;
     background: var(--accent-soft);
@@ -790,4 +809,29 @@ body.selecting .ingredient-row.picked::after {
 .recipe-notes.empty {
     color: var(--muted);
     font-style: italic;
+}
+
+.sub-recipe-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.sub-recipe-arrow {
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.sub-recipe-btn:hover .ingredient-name,
+.sub-recipe-btn:focus-visible .ingredient-name {
+    color: var(--accent-ink);
+    text-decoration: underline;
 }

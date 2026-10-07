@@ -18,27 +18,31 @@ network.
 
 ## Data model
 - **`ingredients`** — base ingredients only (salmon, rice, cucumber…). No sauces here.
-- **`categories`** — protein, base, fresh veg/fruit, cooked veg/fruit, topping, extras.
-  ("Sauces" is a UI section, not backed by this table.)
+- **`categories`** — ingredient categories: protein, base, fresh veg/fruit, cooked veg/fruit,
+  topping, extras.
 - **`ingredient_categories`** — many-to-many (an ingredient can be in several categories).
-- **`recipes`** — all recipes, with a `kind` column:
-  - `bowl` — manually built from ingredients + sauces, with notes
+- **`recipes`** — all recipes. `kind` says where a recipe comes from:
+  - `manual` — built from components (ingredients and/or other recipes), with notes
   - `link` — an external URL + notes
-  - `sauce` — built from ingredients (+ notes on how to make it); also appears in the
-    ingredient list
-- **`recipe_components`** — contents of a recipe. Each row points to *either* an ingredient
-  *or* a sauce (two nullable foreign keys). Lets a bowl contain ingredients and sauces, and
-  a sauce contain its ingredients.
-- **`favorites`** — person (me/her), pointing to *either* an ingredient *or* a sauce (same
+- **`recipe_categories`** — what a recipe *is*: Poke bowl, Sauce, Soup… Each has an
+  `in_ingredient_list` flag: recipes in a flagged category (e.g. Sauce) are shown in the
+  ingredient list and can be picked into other recipes.
+- **`recipe_category_links`** — many-to-many (a recipe can be in several categories, e.g.
+  Soup + a future "Freezer-friendly").
+- **`recipe_components`** — contents of a recipe, in pick order. Each row points to *either*
+  an ingredient *or* another recipe (two nullable foreign keys), so a bowl can contain a
+  sauce and a soup can contain a stock.
+- **`favorites`** — person (me/her), pointing to *either* an ingredient *or* a recipe (same
   two-nullable-FK pattern). A row exists only while the item is favorited.
 
 ### Key design decisions
-- A sauce is **not** an ingredient in the DB — it is a recipe. It is *displayed* in the
-  ingredient list because, conceptually, it is a building block for a bowl.
-- Sauces appear in **both** the ingredient list and the Recipes page.
-- Favorites apply to both ingredients and sauces.
-- The full SQLite schema (including the two-nullable-FK pattern) is created up front so later
-  slices add features without reworking tables.
+- A sauce is **not** an ingredient in the DB — it is a recipe in the Sauce category. It is
+  *displayed* in the ingredient list because that category is flagged `in_ingredient_list`.
+- Any recipe can contain other recipes; the backend rejects loops (a recipe inside itself,
+  directly or through other recipes).
+- New recipe categories are added by seeding a row in `db.py`.
+- While the project is early, schema changes edit `schema.sql` directly and the DB is
+  recreated (no migrations).
 
 ---
 
@@ -82,7 +86,7 @@ with the "who am I" identity + theme.
 
 ### Slice 3 — Create Bowl
 **Goal:** build and save a manual recipe by selecting ingredients.
-- **Backend:** `recipes` (kind=`bowl`) + `recipe_components` + notes; create endpoint.
+- **Backend:** `recipes` + `recipe_components` + notes; create endpoint.
 - **Frontend:** "Create Bowl" button → selection mode; always-visible floating box showing
   current picks with deselect, plus Cancel / Create; Create asks for name + notes.
 - **Test from frontend:** enter mode, select several ingredients while scrolling, deselect one
@@ -96,18 +100,23 @@ with the "who am I" identity + theme.
 - **Test from frontend:** the bowl from Slice 3 shows here; add a link recipe with a URL;
   open each and read details.
 
-### Slice 5 — Sauces
-**Goal:** sauces as recipes that also live in the ingredient list.
-- **Backend:** `recipes` (kind=`sauce`); reuse components/favorites FKs.
-- **Frontend:** "Sauces" section in the Ingredients page populated from sauce recipes;
-  create/edit a sauce (ingredients + notes); sauces are selectable into bowls and can be
-  favorited; sauces also appear on the Recipes page.
-- **Test from frontend:** create a "Spicy Mayo" sauce, see it in the Sauces section, favorite
-  it, include it in a bowl, and read its recipe from the Recipes page.
+### Slice 5 — Recipe categories & recipes inside recipes
+**Goal:** recipes get categories (Poke bowl, Sauce, Soup); any recipe can contain other
+recipes; sauces live in the ingredient list.
+- **Backend:** `recipe_categories` (with `in_ingredient_list`) + `recipe_category_links`;
+  components and favorites can point to a recipe; edit endpoint for recipes with a loop
+  check; favorites endpoints for recipes.
+- **Frontend:** "Build a Bowl" becomes "New recipe" (categories chosen when naming it);
+  a section per flagged category (e.g. 🥫 Sauce) in the ingredient list, pickable into
+  recipes and favoritable; recipes can be edited (manual ones in the builder, links in their
+  dialog); recipe cards show category badges; a recipe inside another opens on tap.
+- **Test from frontend:** create a "Spicy Mayo" in Sauce, see it in the Sauce section,
+  favorite it, include it in a bowl, open the bowl on the Recipes page and tap through to
+  the sauce; a Soup recipe does not appear in the ingredient list.
 
 ### Slice 6 — Recipe filtering
 **Goal:** find recipes by ingredient.
-- **Backend:** filter query over `recipe_components`.
+- **Backend:** filter query over `recipe_components` (and recipe categories).
 - **Frontend:** ingredient filter on the Recipes page ("show all with salmon"), supporting
   one or more ingredients.
 - **Test from frontend:** filter by Salmon → only matching recipes show; clear → all return.
