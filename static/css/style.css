@@ -464,3 +464,174 @@ body {
         -webkit-tap-highlight-color: transparent;
     }
 }
+
+/* ---- Bowl builder ----------------------------------------------------- */
+.field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 1rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    outline: none;
+    resize: vertical;
+}
+
+.field textarea:focus {
+    border-color: var(--accent);
+}
+
+.bowl-summary {
+    margin: 0;
+    color: var(--text);
+}
+
+/* Selection mode: only picking is possible, so hide everything that edits or navigates. */
+body.selecting .app-nav,
+body.selecting #add-ingredient-btn,
+body.selecting #create-bowl-btn,
+body.selecting .fav-hint,
+body.selecting .ingredient-row .icon-btn {
+    display: none;
+}
+
+body.selecting .app-main {
+    /* Room so the last ingredients can scroll above the tray. */
+    padding-bottom: calc(45vh + 40px);
+}
+
+body.selecting .ingredient-row {
+    cursor: pointer;
+    padding: 0 10px;
+    border-radius: 10px;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease;
+}
+
+body.selecting .ingredient-row::after {
+    content: "＋";
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.ingredient-row.picked {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+
+body.selecting .ingredient-row.picked::after {
+    content: "✓";
+    color: var(--accent-ink);
+}
+
+.bowl-tray {
+    position: fixed;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    width: min(860px, calc(100vw - 24px));
+    background: var(--surface);
+    border-top: 3px solid var(--accent);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 40px rgba(30, 20, 40, 0.25);
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    z-index: 10;
+    animation: tray-in 0.25s ease-out;
+}
+
+.bowl-tray[hidden] {
+    display: none;
+}
+
+@keyframes tray-in {
+    from { transform: translate(-50%, 30px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.bowl-tray-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.bowl-tray-header h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--accent-ink);
+}
+
+.bowl-picks {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 30vh;
+    overflow-y: auto;
+}
+
+.bowl-empty {
+    color: var(--muted);
+    font-style: italic;
+    font-size: 0.9rem;
+}
+
+.bowl-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 4px 4px 12px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.bowl-pick-remove {
+    border: none;
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.bowl-pick-remove:hover,
+.bowl-pick-remove:focus-visible {
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.bowl-tray-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translate(-50%, 20px);
+    background: var(--accent-ink);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 20;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}

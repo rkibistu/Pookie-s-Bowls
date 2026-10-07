@@ -1,4 +1,5 @@
-// Pookie's Bowls — app shell (identity, theme, views) + ingredient catalog.
+// Pookie's Bowls — app shell (identity, theme, views), ingredient catalog,
+// and the bowl builder.
 // State that must survive reloads lives in localStorage (per device).
 
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
@@ -93,6 +94,7 @@ function renderIngredients() {
       const list = el("ul", "ingredient-list");
       for (const ingredient of category.ingredients) {
         const row = el("li", "ingredient-row");
+        if (bowlPicks && bowlPicks.has(ingredient.id)) row.classList.add("picked");
         const edit = el("button", "icon-btn", "✏️");
         edit.type = "button";
         edit.title = `Edit ${ingredient.name}`;
@@ -103,7 +105,10 @@ function renderIngredients() {
           renderFavoriteToggle(ingredient),
           edit,
         );
-        row.addEventListener("click", (event) => handleRowTap(event, row, ingredient));
+        row.addEventListener("click", (event) => {
+          if (bowlPicks) toggleBowlPick(ingredient);
+          else handleRowTap(event, row, ingredient);
+        });
         list.append(row);
       }
       card.append(list);
@@ -213,8 +218,8 @@ function openIngredientDialog(ingredient = null) {
   if (!ingredient) document.getElementById("ingredient-name").focus();
 }
 
-function showDialogError(message) {
-  const box = document.getElementById("ingredient-error");
+function showDialogError(message, boxId = "ingredient-error") {
+  const box = document.getElementById(boxId);
   box.textContent = message || "";
   box.hidden = !message;
 }
@@ -280,6 +285,112 @@ function initIngredients() {
   loadIngredients();
 }
 
+// ---- Bowl builder ---------------------------------------------------------
+
+// null outside selection mode; otherwise the picks as Map<id, name> (pick order).
+let bowlPicks = null;
+
+function startBowl() {
+  bowlPicks = new Map();
+  document.body.classList.add("selecting");
+  document.getElementById("bowl-tray").hidden = false;
+  renderBowlTray();
+  renderIngredients();
+}
+
+/** Leave selection mode, dropping every pick. */
+function endBowl() {
+  bowlPicks = null;
+  document.body.classList.remove("selecting");
+  document.getElementById("bowl-tray").hidden = true;
+  renderIngredients();
+}
+
+function toggleBowlPick(ingredient) {
+  if (bowlPicks.has(ingredient.id)) bowlPicks.delete(ingredient.id);
+  else bowlPicks.set(ingredient.id, ingredient.name);
+  renderBowlTray();
+  renderIngredients();
+}
+
+/** The floating tray: one chip per pick, each removable. */
+function renderBowlTray() {
+  const list = document.getElementById("bowl-picks");
+  list.replaceChildren();
+  if (bowlPicks.size === 0) {
+    list.append(el("li", "bowl-empty", "Tap ingredients to add them"));
+  }
+  for (const [id, name] of bowlPicks) {
+    const chip = el("li", "bowl-pick");
+    const remove = el("button", "bowl-pick-remove", "✕");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `Remove ${name}`);
+    remove.addEventListener("click", () => {
+      bowlPicks.delete(id);
+      renderBowlTray();
+      renderIngredients();
+    });
+    chip.append(el("span", null, name), remove);
+    list.append(chip);
+  }
+  document.getElementById("bowl-count").textContent = String(bowlPicks.size);
+  document.getElementById("bowl-create").disabled = bowlPicks.size === 0;
+}
+
+function openBowlDialog() {
+  document.getElementById("bowl-summary").textContent = [...bowlPicks.values()].join(", ");
+  showDialogError(null, "bowl-error");
+  document.getElementById("bowl-dialog").showModal();
+  document.getElementById("bowl-name").focus();
+}
+
+async function saveBowl(event) {
+  event.preventDefault();
+  const body = {
+    kind: "bowl",
+    name: document.getElementById("bowl-name").value,
+    notes: document.getElementById("bowl-notes").value,
+    ingredient_ids: [...bowlPicks.keys()],
+  };
+  const save = document.getElementById("bowl-save");
+  save.disabled = true;
+  try {
+    const bowl = await api("POST", "/api/recipes", body);
+    document.getElementById("bowl-dialog").close();
+    document.getElementById("bowl-form").reset();
+    endBowl();
+    showToast(`“${bowl.name}” saved! 🥣`);
+  } catch (err) {
+    showDialogError(err.message, "bowl-error");
+  } finally {
+    save.disabled = false;
+  }
+}
+
+let toastTimer = null;
+
+/** Briefly show a message at the bottom of the screen. */
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 2500);
+}
+
+function initBowlBuilder() {
+  document.getElementById("create-bowl-btn").addEventListener("click", startBowl);
+  document.getElementById("bowl-cancel").addEventListener("click", () => {
+    document.getElementById("bowl-form").reset();
+    endBowl();
+  });
+  document.getElementById("bowl-create").addEventListener("click", openBowlDialog);
+  document.getElementById("bowl-form").addEventListener("submit", saveBowl);
+  document
+    .getElementById("bowl-dialog-cancel")
+    .addEventListener("click", () => document.getElementById("bowl-dialog").close());
+}
+
 function init() {
   // Restore saved identity (default: "me") and wire the toggle.
   setIdentity(localStorage.getItem(IDENTITY_KEY) || "me");
@@ -294,6 +405,7 @@ function init() {
   });
 
   initIngredients();
+  initBowlBuilder();
 }
 
 document.addEventListener("DOMContentLoaded", init);

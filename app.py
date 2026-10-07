@@ -220,6 +220,73 @@ def remove_favorite(ingredient_id, person):
     return "", 204
 
 
+# ---- Recipes -------------------------------------------------------------
+
+
+def _parse_bowl(payload):
+    """Validate a bowl body; return (name, notes or None, ingredient ids in pick order)."""
+    name = payload.get("name")
+    name = name.strip() if isinstance(name, str) else ""
+    if not name:
+        raise ApiError("Please give the bowl a name.")
+
+    notes = payload.get("notes")
+    if notes is not None and not isinstance(notes, str):
+        raise ApiError("notes must be text.")
+    notes = (notes or "").strip() or None
+
+    ingredient_ids = payload.get("ingredient_ids")
+    if not isinstance(ingredient_ids, list) or not all(
+        isinstance(i, int) and not isinstance(i, bool) for i in ingredient_ids
+    ):
+        raise ApiError("ingredient_ids must be a list of ingredient ids.")
+    ingredient_ids = list(dict.fromkeys(ingredient_ids))  # dedupe, keep order
+    if not ingredient_ids:
+        raise ApiError("Pick at least one ingredient.")
+
+    placeholders = ",".join("?" * len(ingredient_ids))
+    found = db.get_db().execute(
+        f"SELECT COUNT(*) FROM ingredients WHERE id IN ({placeholders})",
+        ingredient_ids,
+    ).fetchone()[0]
+    if found != len(ingredient_ids):
+        raise ApiError("Unknown ingredient.")
+
+    return name, notes, ingredient_ids
+
+
+@app.post("/api/recipes")
+def create_recipe():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        raise ApiError("Expected a JSON object.")
+    if payload.get("kind") != "bowl":
+        raise ApiError("Only bowls can be created for now.")
+
+    name, notes, ingredient_ids = _parse_bowl(payload)
+    conn = db.get_db()
+    with conn:
+        cur = conn.execute(
+            "INSERT INTO recipes (name, kind, notes) VALUES (?, 'bowl', ?)",
+            (name, notes),
+        )
+        recipe_id = cur.lastrowid
+        conn.executemany(
+            "INSERT INTO recipe_components (recipe_id, ingredient_id) VALUES (?, ?)",
+            [(recipe_id, i) for i in ingredient_ids],
+        )
+    return (
+        jsonify(
+            id=recipe_id,
+            kind="bowl",
+            name=name,
+            notes=notes,
+            ingredient_ids=ingredient_ids,
+        ),
+        201,
+    )
+
+
 if __name__ == "__main__":
     debug = os.environ.get("FLASK_DEBUG") == "1"
     app.run(host="0.0.0.0", port=5000, debug=debug)
