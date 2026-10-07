@@ -43,6 +43,19 @@
                 <button type="button" class="primary-btn" id="add-link-btn">+ Add link recipe</button>
             </div>
             <p class="load-error" id="recipes-error" hidden></p>
+            <section class="filter-panel" id="recipe-filter" aria-label="Filter recipes" hidden>
+                <div class="chips" id="recipe-filter-categories"></div>
+                <div class="filter-search">
+                    <input type="text" id="recipe-filter-input" autocomplete="off"
+                           placeholder="🔍 Filter by ingredient…" aria-label="Filter by ingredient">
+                    <ul class="filter-suggestions" id="recipe-filter-suggestions" hidden></ul>
+                </div>
+                <div class="filter-footer">
+                    <ul class="build-picks filter-picks" id="recipe-filter-picks"></ul>
+                    <span class="filter-count" id="recipe-filter-count"></span>
+                    <button type="button" class="secondary-btn" id="recipe-filter-clear" hidden>Clear</button>
+                </div>
+            </section>
             <div id="recipe-list"></div>
         </section>
     </main>

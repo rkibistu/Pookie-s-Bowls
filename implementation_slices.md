@@ -115,8 +115,14 @@ recipes; sauces live in the ingredient list.
   the sauce; a Soup recipe does not appear in the ingredient list.
 
 ### Slice 6 — Recipe filtering
-**Goal:** find recipes by ingredient.
-- **Backend:** filter query over `recipe_components` (and recipe categories).
-- **Frontend:** ingredient filter on the Recipes page ("show all with salmon"), supporting
-  one or more ingredients.
-- **Test from frontend:** filter by Salmon → only matching recipes show; clear → all return.
+**Goal:** find recipes by what's in them and by category.
+- **Backend:** none — `GET /api/recipes` already returns each recipe's categories and
+  components, so filtering happens in the browser.
+- **Frontend:** a filter panel on the Recipes page:
+  - category chips — a recipe must be in *any* of the selected categories;
+  - an ingredient search with suggestions — a recipe must *directly* contain *all* picked
+    items (ingredients or listed recipes like sauces; a bowl containing Spicy Mayo doesn't
+    match "Mayo");
+  - picked items as removable chips, a "3 of 12" count, and Clear.
+- **Test from frontend:** filter by Salmon → only matching recipes show; add Avocado → only
+  recipes with both; pick the Soup chip → only soups; clear → all return.

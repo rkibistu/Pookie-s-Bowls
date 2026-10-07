@@ -337,6 +337,7 @@ let recipeCategories = []; // every recipe category, for the dialogs' chips
 async function loadRecipeCategories() {
   try {
     recipeCategories = (await api("GET", "/api/recipe-categories")).categories;
+    renderFilterCategories();
   } catch (err) {
     showToast(`Couldn't load recipe categories: ${err.message}`);
   }
@@ -511,17 +512,23 @@ function renderCategoryBadges(recipe, badges = el("div", "recipe-badges")) {
   return badges;
 }
 
-/** One card per recipe; tapping a card opens its details. */
+/** One card per recipe that passes the filter; tapping a card opens its details. */
 function renderRecipes() {
   const container = document.getElementById("recipe-list");
   container.replaceChildren();
+  const shown = recipes.filter(matchesFilter);
+  renderFilterState(shown.length);
 
   if (recipes.length === 0) {
     container.append(el("p", "placeholder", "No recipes yet — create one 🥣 or add a link 🔗"));
     return;
   }
+  if (shown.length === 0) {
+    container.append(el("p", "placeholder", "No recipes match — try removing a filter 🔍"));
+    return;
+  }
 
-  for (const recipe of recipes) {
+  for (const recipe of shown) {
     const card = el("button", `recipe-card kind-${recipe.kind}`);
     card.type = "button";
     card.addEventListener("click", () => openRecipe(recipe.id));
@@ -549,6 +556,130 @@ function renderRecipes() {
     if (recipe.notes) card.append(el("p", "recipe-card-notes", recipe.notes));
     container.append(card);
   }
+}
+
+// ---- Recipe filter --------------------------------------------------------
+
+// What the Recipes page is filtered by; kept while switching views. A recipe
+// must be in ANY of the categories and directly contain ALL of the items.
+const recipeFilter = { categoryIds: new Set(), items: new Map() }; // items: Map<itemKey, item>
+const FILTER_SUGGESTIONS = 6;
+
+const filterActive = () => recipeFilter.categoryIds.size > 0 || recipeFilter.items.size > 0;
+
+function matchesFilter(recipe) {
+  const { categoryIds, items } = recipeFilter;
+  if (categoryIds.size && !recipe.categories.some((c) => categoryIds.has(c.id))) return false;
+  const keys = new Set(recipe.components.map(itemKey));
+  return [...items.keys()].every((key) => keys.has(key));
+}
+
+function renderFilterCategories() {
+  renderChips("recipe-filter-categories", categoryChipOptions(), recipeFilter.categoryIds);
+}
+
+/** Picked-item chips, the "3 of 12" count and Clear, after the list changes. */
+function renderFilterState(shownCount) {
+  document.getElementById("recipe-filter").hidden = recipes.length === 0;
+  const picks = document.getElementById("recipe-filter-picks");
+  picks.replaceChildren();
+  for (const [key, item] of recipeFilter.items) {
+    const chip = el("li", "build-pick");
+    const remove = el("button", "build-pick-remove", "✕");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `Stop filtering by ${item.name}`);
+    remove.addEventListener("click", () => {
+      recipeFilter.items.delete(key);
+      renderRecipes();
+    });
+    chip.append(el("span", null, itemLabel(item)), remove);
+    picks.append(chip);
+  }
+  document.getElementById("recipe-filter-count").textContent = filterActive()
+    ? `${shownCount} of ${recipes.length}`
+    : "";
+  document.getElementById("recipe-filter-clear").hidden = !filterActive();
+}
+
+const itemLabel = (item) => (item.type === "recipe" ? `${SUB_RECIPE} ${item.name}` : item.name);
+
+/** Everything that can be filtered by: ingredients and listed recipes, once each. */
+function filterableItems() {
+  const all = new Map();
+  for (const category of categories) {
+    for (const item of category.ingredients) all.set(itemKey(item), item);
+  }
+  for (const section of recipeSections) {
+    for (const item of section.recipes) all.set(itemKey(item), item);
+  }
+  return [...all.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Show items matching what's typed; returns the matches. */
+function renderFilterSuggestions() {
+  const query = document.getElementById("recipe-filter-input").value.trim().toLowerCase();
+  const list = document.getElementById("recipe-filter-suggestions");
+  list.replaceChildren();
+  const matches = query
+    ? filterableItems()
+        .filter((item) => !recipeFilter.items.has(itemKey(item)))
+        .filter((item) => item.name.toLowerCase().includes(query))
+        .slice(0, FILTER_SUGGESTIONS)
+    : [];
+  for (const item of matches) {
+    const option = el("button", "filter-suggestion", itemLabel(item));
+    option.type = "button";
+    option.addEventListener("click", () => addFilterItem(item));
+    const li = el("li");
+    li.append(option);
+    list.append(li);
+  }
+  if (query && matches.length === 0) list.append(el("li", "filter-no-match", "No match"));
+  list.hidden = !query;
+  return matches;
+}
+
+function addFilterItem(item) {
+  recipeFilter.items.set(itemKey(item), { type: item.type, id: item.id, name: item.name });
+  const input = document.getElementById("recipe-filter-input");
+  input.value = "";
+  renderFilterSuggestions();
+  input.focus();
+  renderRecipes();
+}
+
+function clearFilter() {
+  recipeFilter.categoryIds.clear();
+  recipeFilter.items.clear();
+  renderFilterCategories();
+  renderRecipes();
+}
+
+function initRecipeFilter() {
+  const input = document.getElementById("recipe-filter-input");
+  input.addEventListener("input", renderFilterSuggestions);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const [first] = renderFilterSuggestions();
+      if (first) addFilterItem(first);
+    } else if (event.key === "Escape") {
+      input.value = "";
+      renderFilterSuggestions();
+    }
+  });
+  // Tapping anywhere else closes the suggestions.
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".filter-search")) {
+      document.getElementById("recipe-filter-suggestions").hidden = true;
+    }
+  });
+  document.getElementById("recipe-filter-categories").addEventListener("change", () => {
+    recipeFilter.categoryIds.clear();
+    for (const id of checkedChipIds("recipe-filter-categories")) recipeFilter.categoryIds.add(id);
+    renderRecipes();
+  });
+  document.getElementById("recipe-filter-clear").addEventListener("click", clearFilter);
 }
 
 function hostname(url) {
@@ -724,6 +855,7 @@ function init() {
   initIngredients();
   initBuilder();
   initRecipes();
+  initRecipeFilter();
 }
 
 document.addEventListener("DOMContentLoaded", init);
