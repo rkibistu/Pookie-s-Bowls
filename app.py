@@ -2,6 +2,7 @@
 
 import os
 import sqlite3
+from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request
 
@@ -223,17 +224,26 @@ def remove_favorite(ingredient_id, person):
 # ---- Recipes -------------------------------------------------------------
 
 
-def _parse_bowl(payload):
-    """Validate a bowl body; return (name, notes or None, ingredient ids in pick order)."""
+def _parse_name(payload, what):
     name = payload.get("name")
     name = name.strip() if isinstance(name, str) else ""
     if not name:
-        raise ApiError("Please give the bowl a name.")
+        raise ApiError(f"Please give the {what} a name.")
+    return name
 
+
+def _parse_notes(payload):
+    """Optional notes; blank becomes None."""
     notes = payload.get("notes")
     if notes is not None and not isinstance(notes, str):
         raise ApiError("notes must be text.")
-    notes = (notes or "").strip() or None
+    return (notes or "").strip() or None
+
+
+def _parse_bowl(payload):
+    """Validate a bowl body; return (name, notes or None, ingredient ids in pick order)."""
+    name = _parse_name(payload, "bowl")
+    notes = _parse_notes(payload)
 
     ingredient_ids = payload.get("ingredient_ids")
     if not isinstance(ingredient_ids, list) or not all(
@@ -255,36 +265,128 @@ def _parse_bowl(payload):
     return name, notes, ingredient_ids
 
 
+def _parse_link(payload):
+    """Validate a link body; return (name, http(s) url, notes or None)."""
+    name = _parse_name(payload, "recipe")
+    notes = _parse_notes(payload)
+
+    url = payload.get("url")
+    url = url.strip() if isinstance(url, str) else ""
+    if url and "://" not in url:
+        url = "https://" + url  # "example.com/poke" → https://example.com/poke
+    # Only http(s) is accepted, so the URL is always safe to use as an href.
+    invalid = ApiError("Please enter a valid link (http/https).")
+    if not url or any(c.isspace() for c in url):
+        raise invalid
+    try:
+        parts = urlsplit(url)
+        parts.port  # raises ValueError on a malformed port
+    except ValueError:
+        raise invalid
+    if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
+        raise invalid
+
+    return name, url, notes
+
+
+def _get_recipe(conn, recipe_id):
+    """Return one recipe with its ingredients (pick order), or raise 404."""
+    row = conn.execute(
+        "SELECT id, kind, name, url, notes, created_at FROM recipes WHERE id = ?",
+        (recipe_id,),
+    ).fetchone()
+    if row is None:
+        raise ApiError("Recipe not found.", 404)
+
+    ingredients = [
+        {"id": r["id"], "name": r["name"], "favorites": []}
+        for r in conn.execute(
+            "SELECT i.id, i.name FROM recipe_components rc "
+            "JOIN ingredients i ON i.id = rc.ingredient_id "
+            "WHERE rc.recipe_id = ? ORDER BY rc.id",
+            (recipe_id,),
+        )
+    ]
+    by_id = {i["id"]: i for i in ingredients}
+    for r in conn.execute(
+        "SELECT f.ingredient_id, f.person FROM favorites f "
+        "JOIN recipe_components rc ON rc.ingredient_id = f.ingredient_id "
+        "WHERE rc.recipe_id = ? ORDER BY f.person DESC",
+        (recipe_id,),
+    ):
+        by_id[r["ingredient_id"]]["favorites"].append(r["person"])
+
+    return {**dict(row), "ingredients": ingredients}
+
+
+@app.get("/api/recipes")
+def list_recipes():
+    """All recipes, newest first, each with its ingredient names."""
+    conn = db.get_db()
+    names = {}
+    for r in conn.execute(
+        "SELECT rc.recipe_id, i.name FROM recipe_components rc "
+        "JOIN ingredients i ON i.id = rc.ingredient_id ORDER BY rc.id"
+    ):
+        names.setdefault(r["recipe_id"], []).append(r["name"])
+
+    recipes = [
+        {**dict(r), "ingredients": names.get(r["id"], [])}
+        for r in conn.execute(
+            "SELECT id, kind, name, url, notes FROM recipes "
+            "ORDER BY created_at DESC, id DESC"
+        )
+    ]
+    return jsonify(recipes=recipes)
+
+
+@app.get("/api/recipes/<int:recipe_id>")
+def get_recipe(recipe_id):
+    return jsonify(_get_recipe(db.get_db(), recipe_id))
+
+
 @app.post("/api/recipes")
 def create_recipe():
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         raise ApiError("Expected a JSON object.")
-    if payload.get("kind") != "bowl":
-        raise ApiError("Only bowls can be created for now.")
 
-    name, notes, ingredient_ids = _parse_bowl(payload)
+    kind = payload.get("kind")
+    conn = db.get_db()
+    if kind == "bowl":
+        name, notes, ingredient_ids = _parse_bowl(payload)
+        with conn:
+            cur = conn.execute(
+                "INSERT INTO recipes (name, kind, notes) VALUES (?, 'bowl', ?)",
+                (name, notes),
+            )
+            conn.executemany(
+                "INSERT INTO recipe_components (recipe_id, ingredient_id) "
+                "VALUES (?, ?)",
+                [(cur.lastrowid, i) for i in ingredient_ids],
+            )
+    elif kind == "link":
+        name, url, notes = _parse_link(payload)
+        with conn:
+            cur = conn.execute(
+                "INSERT INTO recipes (name, kind, url, notes) "
+                "VALUES (?, 'link', ?, ?)",
+                (name, url, notes),
+            )
+    else:
+        raise ApiError("kind must be 'bowl' or 'link'.")
+
+    return jsonify(_get_recipe(conn, cur.lastrowid)), 201
+
+
+@app.delete("/api/recipes/<int:recipe_id>")
+def delete_recipe(recipe_id):
     conn = db.get_db()
     with conn:
-        cur = conn.execute(
-            "INSERT INTO recipes (name, kind, notes) VALUES (?, 'bowl', ?)",
-            (name, notes),
-        )
-        recipe_id = cur.lastrowid
-        conn.executemany(
-            "INSERT INTO recipe_components (recipe_id, ingredient_id) VALUES (?, ?)",
-            [(recipe_id, i) for i in ingredient_ids],
-        )
-    return (
-        jsonify(
-            id=recipe_id,
-            kind="bowl",
-            name=name,
-            notes=notes,
-            ingredient_ids=ingredient_ids,
-        ),
-        201,
-    )
+        cur = conn.execute("DELETE FROM recipes WHERE id = ?", (recipe_id,))
+    if cur.rowcount == 0:
+        raise ApiError("Recipe not found.", 404)
+    return "", 204
 
 
 if __name__ == "__main__":

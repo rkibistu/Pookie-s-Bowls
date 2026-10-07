@@ -39,7 +39,11 @@
         </section>
 
         <section class="view" id="view-recipes" hidden>
-            <p class="placeholder">Recipes will live here. (Slice 4)</p>
+            <div class="toolbar">
+                <button type="button" class="primary-btn" id="add-link-btn">+ Add link recipe</button>
+            </div>
+            <p class="load-error" id="recipes-error" hidden></p>
+            <div id="recipe-list"></div>
         </section>
     </main>
 
@@ -107,6 +111,61 @@
                 <button type="submit" class="primary-btn" id="bowl-save">Save bowl</button>
             </div>
         </form>
+    </dialog>
+
+    <dialog class="dialog" id="link-dialog">
+        <form id="link-form" novalidate>
+            <h2>Add link recipe 🔗</h2>
+
+            <label class="field">
+                <span class="field-label">Name</span>
+                <input type="text" id="link-name" maxlength="80" autocomplete="off" required>
+            </label>
+
+            <label class="field">
+                <span class="field-label">Link</span>
+                <input type="url" id="link-url" inputmode="url" autocomplete="off"
+                       placeholder="https://…" required>
+            </label>
+
+            <label class="field">
+                <span class="field-label">Notes</span>
+                <textarea id="link-notes" rows="4" placeholder="What we'd change, how it turned out…"></textarea>
+            </label>
+
+            <p class="form-error" id="link-error" hidden></p>
+
+            <div class="dialog-actions">
+                <span class="spacer"></span>
+                <button type="button" class="secondary-btn" id="link-cancel">Cancel</button>
+                <button type="submit" class="primary-btn" id="link-save">Save</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog class="dialog" id="recipe-dialog">
+        <span class="recipe-kind" id="recipe-kind"></span>
+        <h2 id="recipe-title"></h2>
+
+        <a class="recipe-link" id="recipe-url" target="_blank" rel="noopener noreferrer" hidden>Open recipe ↗</a>
+
+        <div class="field" id="recipe-ingredients-field">
+            <span class="field-label">Ingredients</span>
+            <ul class="recipe-ingredients" id="recipe-ingredients"></ul>
+        </div>
+
+        <div class="field">
+            <span class="field-label">Notes</span>
+            <p class="recipe-notes" id="recipe-notes"></p>
+        </div>
+
+        <p class="form-error" id="recipe-error" hidden></p>
+
+        <div class="dialog-actions">
+            <button type="button" class="danger-btn" id="recipe-delete">Delete</button>
+            <span class="spacer"></span>
+            <button type="button" class="secondary-btn" id="recipe-close">Close</button>
+        </div>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

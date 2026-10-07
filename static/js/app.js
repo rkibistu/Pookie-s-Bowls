@@ -1,5 +1,5 @@
 // Pookie's Bowls — app shell (identity, theme, views), ingredient catalog,
-// and the bowl builder.
+// the bowl builder, and the recipes page.
 // State that must survive reloads lives in localStorage (per device).
 
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
@@ -34,6 +34,8 @@ function setView(view) {
   document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
+  // Recipes show ingredient names, which may have changed since the last load.
+  if (view === "recipes") loadRecipes();
 }
 
 /** fetch() wrapper for the JSON API; throws an Error with the server's message. */
@@ -224,8 +226,8 @@ function showDialogError(message, boxId = "ingredient-error") {
   box.hidden = !message;
 }
 
-function resetDeleteButton() {
-  const del = document.getElementById("ingredient-delete");
+function resetDeleteButton(id = "ingredient-delete") {
+  const del = document.getElementById(id);
   delete del.dataset.armed;
   del.textContent = "Delete";
 }
@@ -391,6 +393,171 @@ function initBowlBuilder() {
     .addEventListener("click", () => document.getElementById("bowl-dialog").close());
 }
 
+// ---- Recipes --------------------------------------------------------------
+
+const KIND_LABELS = { bowl: "🥣 Bowl", link: "🔗 Link" };
+const CARD_CHIPS = 6; // ingredient chips shown on a card before "+N"
+
+let recipes = []; // last loaded list
+let openRecipeId = null; // recipe shown in the detail dialog
+
+async function loadRecipes() {
+  const errorBox = document.getElementById("recipes-error");
+  try {
+    recipes = (await api("GET", "/api/recipes")).recipes;
+    errorBox.hidden = true;
+    renderRecipes();
+  } catch (err) {
+    errorBox.textContent = `Couldn't load recipes: ${err.message}`;
+    errorBox.hidden = false;
+  }
+}
+
+/** One card per recipe; tapping a card opens its details. */
+function renderRecipes() {
+  const container = document.getElementById("recipe-list");
+  container.replaceChildren();
+
+  if (recipes.length === 0) {
+    container.append(el("p", "placeholder", "No recipes yet — build a bowl 🥣 or add a link 🔗"));
+    return;
+  }
+
+  for (const recipe of recipes) {
+    const card = el("button", `recipe-card kind-${recipe.kind}`);
+    card.type = "button";
+    card.addEventListener("click", () => openRecipe(recipe.id));
+
+    const header = el("header", "recipe-card-header");
+    header.append(
+      el("span", "recipe-card-emoji", recipe.kind === "link" ? "🔗" : "🥣"),
+      el("h2", "recipe-card-title", recipe.name),
+    );
+    card.append(header);
+
+    if (recipe.kind === "link") {
+      card.append(el("p", "recipe-card-host", hostname(recipe.url)));
+    } else if (recipe.ingredients.length) {
+      const chips = el("div", "recipe-card-chips");
+      for (const name of recipe.ingredients.slice(0, CARD_CHIPS)) {
+        chips.append(el("span", "recipe-chip", name));
+      }
+      const extra = recipe.ingredients.length - CARD_CHIPS;
+      if (extra > 0) chips.append(el("span", "recipe-chip more", `+${extra}`));
+      card.append(chips);
+    }
+
+    if (recipe.notes) card.append(el("p", "recipe-card-notes", recipe.notes));
+    container.append(card);
+  }
+}
+
+function hostname(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+/** Fetch a recipe and show it in the detail dialog. */
+async function openRecipe(id) {
+  const errorBox = document.getElementById("recipes-error");
+  let recipe;
+  try {
+    recipe = await api("GET", `/api/recipes/${id}`);
+  } catch (err) {
+    errorBox.textContent = `Couldn't open recipe: ${err.message}`;
+    errorBox.hidden = false;
+    return;
+  }
+  openRecipeId = recipe.id;
+
+  document.getElementById("recipe-kind").textContent = KIND_LABELS[recipe.kind] || recipe.kind;
+  document.getElementById("recipe-title").textContent = recipe.name;
+
+  const link = document.getElementById("recipe-url");
+  link.hidden = recipe.kind !== "link";
+  if (recipe.kind === "link") link.href = recipe.url; // server only accepts http(s)
+  else link.removeAttribute("href");
+
+  const list = document.getElementById("recipe-ingredients");
+  list.replaceChildren();
+  for (const ingredient of recipe.ingredients) {
+    const item = el("li", "recipe-ingredient");
+    item.append(renderIngredientLabel(ingredient));
+    list.append(item);
+  }
+  document.getElementById("recipe-ingredients-field").hidden = recipe.ingredients.length === 0;
+
+  const notes = document.getElementById("recipe-notes");
+  notes.textContent = recipe.notes || "No notes";
+  notes.classList.toggle("empty", !recipe.notes);
+
+  resetDeleteButton("recipe-delete");
+  showDialogError(null, "recipe-error");
+  document.getElementById("recipe-dialog").showModal();
+}
+
+/** First tap arms the button, second tap deletes. */
+async function deleteRecipe() {
+  const del = document.getElementById("recipe-delete");
+  if (!del.dataset.armed) {
+    del.dataset.armed = "1";
+    del.textContent = "Really delete?";
+    return;
+  }
+  try {
+    await api("DELETE", `/api/recipes/${openRecipeId}`);
+    document.getElementById("recipe-dialog").close();
+    await loadRecipes();
+  } catch (err) {
+    resetDeleteButton("recipe-delete");
+    showDialogError(err.message, "recipe-error");
+  }
+}
+
+function openLinkDialog() {
+  document.getElementById("link-form").reset();
+  showDialogError(null, "link-error");
+  document.getElementById("link-dialog").showModal();
+  document.getElementById("link-name").focus();
+}
+
+async function saveLink(event) {
+  event.preventDefault();
+  const body = {
+    kind: "link",
+    name: document.getElementById("link-name").value,
+    url: document.getElementById("link-url").value,
+    notes: document.getElementById("link-notes").value,
+  };
+  const save = document.getElementById("link-save");
+  save.disabled = true;
+  try {
+    const recipe = await api("POST", "/api/recipes", body);
+    document.getElementById("link-dialog").close();
+    await loadRecipes();
+    showToast(`“${recipe.name}” saved! 🔗`);
+  } catch (err) {
+    showDialogError(err.message, "link-error");
+  } finally {
+    save.disabled = false;
+  }
+}
+
+function initRecipes() {
+  document.getElementById("add-link-btn").addEventListener("click", openLinkDialog);
+  document.getElementById("link-form").addEventListener("submit", saveLink);
+  document
+    .getElementById("link-cancel")
+    .addEventListener("click", () => document.getElementById("link-dialog").close());
+  document.getElementById("recipe-delete").addEventListener("click", deleteRecipe);
+  document
+    .getElementById("recipe-close")
+    .addEventListener("click", () => document.getElementById("recipe-dialog").close());
+}
+
 function init() {
   // Restore saved identity (default: "me") and wire the toggle.
   setIdentity(localStorage.getItem(IDENTITY_KEY) || "me");
@@ -406,6 +573,7 @@ function init() {
 
   initIngredients();
   initBowlBuilder();
+  initRecipes();
 }
 
 document.addEventListener("DOMContentLoaded", init);
