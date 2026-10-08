@@ -430,6 +430,16 @@ def _save_recipe_parts(conn, recipe_id, recipe):
     )
 
 
+def _write_recipe(conn, recipe_id, recipe):
+    """Save a parsed recipe over an existing one."""
+    with conn:
+        conn.execute(
+            "UPDATE recipes SET name = ?, url = ?, notes = ? WHERE id = ?",
+            (recipe["name"], recipe["url"], recipe["notes"], recipe_id),
+        )
+        _save_recipe_parts(conn, recipe_id, recipe)
+
+
 def _recipe_categories(conn, recipe_id=None):
     """Categories per recipe, in display order: {recipe id: [category]}."""
     where, params = ("WHERE l.recipe_id = ?", (recipe_id,)) if recipe_id else ("", ())
@@ -566,13 +576,31 @@ def update_recipe(recipe_id):
     if not isinstance(payload, dict):
         raise ApiError("Expected a JSON object.")
     recipe = _parse_recipe(payload, kind, recipe_id)
+    _write_recipe(conn, recipe_id, recipe)
+    return jsonify(_get_recipe(conn, recipe_id))
 
-    with conn:
-        conn.execute(
-            "UPDATE recipes SET name = ?, url = ?, notes = ? WHERE id = ?",
-            (recipe["name"], recipe["url"], recipe["notes"], recipe_id),
-        )
-        _save_recipe_parts(conn, recipe_id, recipe)
+
+@app.patch("/api/recipes/<int:recipe_id>")
+def patch_recipe(recipe_id):
+    """Change only the fields sent (e.g. just notes); the rest stays as stored."""
+    conn = db.get_db()
+    current = _get_recipe(conn, recipe_id)  # 404 if missing
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        raise ApiError("Expected a JSON object.")
+    merged = {
+        "name": current["name"],
+        "notes": current["notes"],
+        "url": current["url"],
+        "category_ids": [c["id"] for c in current["categories"]],
+        "components": [
+            {"recipe_id" if c["type"] == "recipe" else "ingredient_id": c["id"]}
+            for c in current["components"]
+        ],
+    }
+    merged.update((k, v) for k, v in payload.items() if k in merged)
+    recipe = _parse_recipe(merged, current["kind"], recipe_id)
+    _write_recipe(conn, recipe_id, recipe)
     return jsonify(_get_recipe(conn, recipe_id))
 
 

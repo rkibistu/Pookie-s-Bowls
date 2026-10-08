@@ -87,7 +87,7 @@
 
     <aside class="build-tray" id="build-tray" aria-label="Your recipe" hidden>
         <header class="build-tray-header">
-            <h2>🥣 Your recipe</h2>
+            <h2 id="build-title">🥣 Your recipe</h2>
             <span class="category-count" id="build-count">0</span>
         </header>
         <ul class="build-picks" id="build-picks"></ul>
@@ -99,7 +99,7 @@
 
     <dialog class="dialog" id="build-dialog">
         <form id="build-form" novalidate>
-            <h2 id="build-dialog-title">Name your recipe ✨</h2>
+            <h2>Name your recipe ✨</h2>
 
             <label class="field">
                 <span class="field-label">Name</span>
@@ -133,7 +133,7 @@
 
     <dialog class="dialog" id="link-dialog">
         <form id="link-form" novalidate>
-            <h2 id="link-dialog-title">Add link recipe 🔗</h2>
+            <h2>Add link recipe 🔗</h2>
 
             <label class="field">
                 <span class="field-label">Name</span>
@@ -167,19 +167,34 @@
     </dialog>
 
     <dialog class="dialog" id="recipe-dialog">
-        <div class="recipe-badges" id="recipe-badges"></div>
-        <h2 id="recipe-title"></h2>
+        <div class="chips recipe-categories" id="recipe-categories" aria-label="Categories"></div>
+        <h2 class="editable" id="recipe-title" tabindex="0" title="Tap to rename"></h2>
 
-        <a class="recipe-link" id="recipe-url" target="_blank" rel="noopener noreferrer" hidden>Open recipe ↗</a>
+        <div class="recipe-link-row" id="recipe-url-row" hidden>
+            <a class="recipe-link" id="recipe-url" target="_blank" rel="noopener noreferrer">Open recipe ↗</a>
+            <button type="button" class="icon-btn" id="recipe-url-edit"
+                    title="Change link" aria-label="Change link">✏️</button>
+        </div>
 
         <div class="field" id="recipe-ingredients-field">
-            <span class="field-label">Ingredients</span>
+            <div class="field-header">
+                <span class="field-label">Ingredients</span>
+                <button type="button" class="text-btn" id="recipe-ingredients-edit">✏️ Edit</button>
+            </div>
             <ul class="recipe-ingredients" id="recipe-ingredients"></ul>
+            <div id="recipe-ingredients-tools" hidden>
+                <div class="filter-search">
+                    <input type="text" id="recipe-add-input" autocomplete="off"
+                           placeholder="+ Add ingredient…" aria-label="Add ingredient">
+                    <ul class="filter-suggestions" id="recipe-add-suggestions" hidden></ul>
+                </div>
+                <button type="button" class="text-btn" id="recipe-pick">Pick from list… ›</button>
+            </div>
         </div>
 
         <div class="field">
             <span class="field-label">Notes</span>
-            <p class="recipe-notes" id="recipe-notes"></p>
+            <p class="recipe-notes editable" id="recipe-notes" tabindex="0" title="Tap to edit"></p>
         </div>
 
         <p class="form-error" id="recipe-error" hidden></p>
@@ -187,7 +202,6 @@
         <div class="dialog-actions">
             <button type="button" class="danger-btn" id="recipe-delete">Delete</button>
             <span class="spacer"></span>
-            <button type="button" class="secondary-btn" id="recipe-edit">Edit</button>
             <button type="button" class="secondary-btn" id="recipe-close">Close</button>
         </div>
     </dialog>

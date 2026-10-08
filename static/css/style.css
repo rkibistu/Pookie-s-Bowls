@@ -829,8 +829,53 @@ body.selecting .ingredient-row.unpickable::after {
     gap: 4px;
 }
 
-#recipe-badges {
-    margin-bottom: 6px;
+.recipe-categories {
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.recipe-categories .chip span {
+    padding: 4px 12px;
+    font-size: 0.8rem;
+}
+
+/* The last category can't be unticked. */
+.chip input:disabled + span {
+    cursor: default;
+}
+
+/* Text that turns into a text box when tapped. */
+.editable {
+    padding: 2px 4px;
+    cursor: text;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+}
+
+.editable:hover,
+.editable:focus-visible {
+    background: var(--accent-soft);
+    outline: none;
+}
+
+.dialog .inline-edit {
+    display: block;
+    width: 100%;
+    padding: 2px 4px;
+    border: none;
+    border-radius: 8px;
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    background: var(--surface);
+    color: var(--text);
+    resize: none;
+}
+
+.recipe-link-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 0 16px;
 }
 
 .recipe-kind {
@@ -849,7 +894,6 @@ body.selecting .ingredient-row.unpickable::after {
 
 .recipe-link {
     display: inline-block;
-    margin: 0 0 16px;
     padding: 8px 16px;
     border-radius: 999px;
     background: var(--accent);
@@ -863,19 +907,76 @@ body.selecting .ingredient-row.unpickable::after {
     filter: brightness(1.1);
 }
 
+.field-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+}
+
+.field-header .text-btn {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
 .recipe-ingredients {
     list-style: none;
-    margin: 0;
+    margin: 0 0 8px;
     padding: 0;
 }
 
 .recipe-ingredient {
-    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 4px 0;
     border-bottom: 1px solid var(--border);
 }
 
 .recipe-ingredient:last-child {
     border-bottom: none;
+}
+
+.recipe-ingredient-remove {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.recipe-ingredient-remove:hover,
+.recipe-ingredient-remove:focus-visible {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* The last ingredient can't be removed. */
+.recipe-ingredient-remove:disabled {
+    opacity: 0.4;
+    cursor: default;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+}
+
+.text-btn {
+    margin-top: 8px;
+    padding: 4px 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: var(--accent-ink);
+    cursor: pointer;
+}
+
+.text-btn:hover,
+.text-btn:focus-visible {
+    text-decoration: underline;
 }
 
 .recipe-notes {

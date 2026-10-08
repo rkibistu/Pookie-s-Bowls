@@ -134,7 +134,7 @@ function renderItemRow(item) {
   edit.title = `Edit ${item.name}`;
   edit.setAttribute("aria-label", `Edit ${item.name}`);
   edit.addEventListener("click", () => {
-    if (item.type === "recipe") editRecipe(item.id);
+    if (item.type === "recipe") openRecipe(item.id);
     else openIngredientDialog(item);
   });
   row.append(renderIngredientLabel(item), renderFavoriteToggle(item), edit);
@@ -330,7 +330,8 @@ function initIngredients() {
 
 // null outside selection mode; otherwise {picks, recipe, returnTo}:
 // picks is Map<itemKey, {type, id, name}> in pick order, recipe is the
-// recipe being edited (null for a new one), returnTo the view to go back to.
+// recipe whose ingredients are being changed (null for a new one), returnTo
+// the view to go back to.
 let builder = null;
 let recipeCategories = []; // every recipe category, for the dialogs' chips
 
@@ -347,13 +348,18 @@ async function loadRecipeCategories() {
 const categoryChipOptions = () =>
   recipeCategories.map((c) => ({ id: c.id, name: `${c.emoji} ${c.name}` }));
 
-/** A recipe's category ids; a new recipe starts as a poke bowl. */
-function selectedCategoryIds(recipe) {
-  const selected = recipe ? recipe.categories : recipeCategories.filter((c) => c.slug === "bowl");
-  return new Set(selected.map((c) => c.id));
-}
+/** A new recipe starts as a poke bowl. */
+const defaultCategoryIds = () =>
+  new Set(recipeCategories.filter((c) => c.slug === "bowl").map((c) => c.id));
 
-/** Enter selection mode; pass a manual recipe to edit it. */
+/** Picks or components as the API's [{ingredient_id} | {recipe_id}]. */
+const componentsBody = (items) =>
+  [...items].map((x) => (x.type === "recipe" ? { recipe_id: x.id } : { ingredient_id: x.id }));
+
+/**
+ * Enter selection mode. Without a recipe it builds a new one (then asks for a
+ * name); with a manual recipe it only changes that recipe's ingredients.
+ */
 function startBuilder(recipe = null, returnTo = null) {
   builder = { picks: new Map(), recipe, returnTo };
   for (const c of recipe ? recipe.components : []) {
@@ -362,13 +368,11 @@ function startBuilder(recipe = null, returnTo = null) {
 
   // Fill the name dialog now, so going Back and forth keeps what was typed.
   document.getElementById("build-form").reset();
-  document.getElementById("build-dialog-title").textContent = recipe
-    ? "Edit recipe ✏️"
-    : "Name your recipe ✨";
-  document.getElementById("build-name").value = recipe ? recipe.name : "";
-  document.getElementById("build-notes").value = recipe ? recipe.notes || "" : "";
-  renderChips("build-categories", categoryChipOptions(), selectedCategoryIds(recipe));
-  document.getElementById("build-create").textContent = recipe ? "Save" : "Create";
+  renderChips("build-categories", categoryChipOptions(), defaultCategoryIds());
+  document.getElementById("build-title").textContent = recipe
+    ? `🥣 ${recipe.name}`
+    : "🥣 Your recipe";
+  document.getElementById("build-create").textContent = recipe ? "Done ✓" : "Create";
 
   document.body.classList.add("selecting");
   document.getElementById("build-tray").hidden = false;
@@ -376,15 +380,16 @@ function startBuilder(recipe = null, returnTo = null) {
   renderIngredients();
 }
 
-/** Leave selection mode, dropping every pick. */
+/** Leave selection mode, dropping every pick; back to the recipe if editing one. */
 function endBuilder() {
-  const returnTo = builder && builder.returnTo;
+  const { returnTo, recipe } = builder || {};
   builder = null;
   document.body.classList.remove("selecting");
   document.getElementById("build-tray").hidden = true;
   document.getElementById("build-form").reset();
   renderIngredients();
   if (returnTo) setView(returnTo);
+  if (recipe) openRecipe(recipe.id);
 }
 
 function togglePick(item) {
@@ -435,16 +440,12 @@ async function saveBuilt(event) {
     name: document.getElementById("build-name").value,
     notes: document.getElementById("build-notes").value,
     category_ids: checkedChipIds("build-categories"),
-    components: [...builder.picks.values()].map((pick) =>
-      pick.type === "recipe" ? { recipe_id: pick.id } : { ingredient_id: pick.id },
-    ),
+    components: componentsBody(builder.picks.values()),
   };
   const save = document.getElementById("build-save");
   save.disabled = true;
   try {
-    const recipe = builder.recipe
-      ? await api("PUT", `/api/recipes/${builder.recipe.id}`, body)
-      : await api("POST", "/api/recipes", body);
+    const recipe = await api("POST", "/api/recipes", body);
     document.getElementById("build-dialog").close();
     endBuilder();
     await loadIngredients(); // a new or renamed sauce shows up in the list
@@ -453,6 +454,22 @@ async function saveBuilt(event) {
     showDialogError(err.message, "build-error");
   } finally {
     save.disabled = false;
+  }
+}
+
+/** Done while changing a recipe's ingredients: save them and go back to it. */
+async function savePickedComponents() {
+  const done = document.getElementById("build-create");
+  done.disabled = true;
+  try {
+    await api("PATCH", `/api/recipes/${builder.recipe.id}`, {
+      components: componentsBody(builder.picks.values()),
+    });
+    endBuilder();
+    showToast("Saved ✓");
+  } catch (err) {
+    showToast(`Couldn't save: ${err.message}`);
+    done.disabled = false;
   }
 }
 
@@ -470,7 +487,10 @@ function showToast(message) {
 function initBuilder() {
   document.getElementById("new-recipe-btn").addEventListener("click", () => startBuilder());
   document.getElementById("build-cancel").addEventListener("click", endBuilder);
-  document.getElementById("build-create").addEventListener("click", openBuildDialog);
+  document.getElementById("build-create").addEventListener("click", () => {
+    if (builder.recipe) savePickedComponents();
+    else openBuildDialog();
+  });
   document.getElementById("build-form").addEventListener("submit", saveBuilt);
   document
     .getElementById("build-dialog-cancel")
@@ -484,7 +504,10 @@ const CARD_CHIPS = 6; // component chips shown on a card before "+N"
 const SUB_RECIPE = "📖"; // marks a recipe used inside another recipe
 
 let recipes = []; // last loaded list
-let openRecipeId = null; // recipe shown in the detail dialog
+let shownRecipe = null; // recipe shown in the recipe dialog
+let recipeChanged = false; // saved something since the dialog opened
+let editingIngredients = false; // ingredient list shows ✕, add box and picker link
+let recipeSaving = Promise.resolve(); // saves run one after another
 
 /** A recipe's emoji: its first category's. */
 function recipeEmoji(recipe) {
@@ -503,9 +526,9 @@ async function loadRecipes() {
   }
 }
 
-/** Category badges like "🥫 Sauce", into a new or the given box. */
-function renderCategoryBadges(recipe, badges = el("div", "recipe-badges")) {
-  badges.replaceChildren();
+/** Category badges like "🥫 Sauce". */
+function renderCategoryBadges(recipe) {
+  const badges = el("div", "recipe-badges");
   for (const category of recipe.categories) {
     badges.append(el("span", "recipe-kind", `${category.emoji} ${category.name}`));
   }
@@ -615,37 +638,57 @@ function filterableItems() {
   return [...all.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Show items matching what's typed; returns the matches. */
-function renderFilterSuggestions() {
-  const query = document.getElementById("recipe-filter-input").value.trim().toLowerCase();
-  const list = document.getElementById("recipe-filter-suggestions");
-  list.replaceChildren();
-  const matches = query
-    ? filterableItems()
-        .filter((item) => !recipeFilter.items.has(itemKey(item)))
-        .filter((item) => item.name.toLowerCase().includes(query))
-        .slice(0, FILTER_SUGGESTIONS)
-    : [];
-  for (const item of matches) {
-    const option = el("button", "filter-suggestion", itemLabel(item));
-    option.type = "button";
-    option.addEventListener("click", () => addFilterItem(item));
-    const li = el("li");
-    li.append(option);
-    list.append(li);
-  }
-  if (query && matches.length === 0) list.append(el("li", "filter-no-match", "No match"));
-  list.hidden = !query;
-  return matches;
-}
+/**
+ * Type-ahead over filterableItems(): typing shows matches under the input,
+ * tapping one (or Enter for the first) calls onPick(item). Items whose key
+ * excluded(key) says are already taken aren't suggested.
+ */
+function initItemSearch(inputId, listId, excluded, onPick) {
+  const input = document.getElementById(inputId);
+  const list = document.getElementById(listId);
 
-function addFilterItem(item) {
-  recipeFilter.items.set(itemKey(item), { type: item.type, id: item.id, name: item.name });
-  const input = document.getElementById("recipe-filter-input");
-  input.value = "";
-  renderFilterSuggestions();
-  input.focus();
-  renderRecipes();
+  /** Show items matching what's typed; returns the matches. */
+  function render() {
+    const query = input.value.trim().toLowerCase();
+    list.replaceChildren();
+    const matches = query
+      ? filterableItems()
+          .filter((item) => !excluded(itemKey(item)))
+          .filter((item) => item.name.toLowerCase().includes(query))
+          .slice(0, FILTER_SUGGESTIONS)
+      : [];
+    for (const item of matches) {
+      const option = el("button", "filter-suggestion", itemLabel(item));
+      option.type = "button";
+      option.addEventListener("click", () => pick(item));
+      const li = el("li");
+      li.append(option);
+      list.append(li);
+    }
+    if (query && matches.length === 0) list.append(el("li", "filter-no-match", "No match"));
+    list.hidden = !query;
+    return matches;
+  }
+
+  function pick(item) {
+    input.value = "";
+    render();
+    input.focus();
+    onPick({ type: item.type, id: item.id, name: item.name });
+  }
+
+  input.addEventListener("input", render);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const [first] = render();
+      if (first) pick(first);
+    } else if (event.key === "Escape" && input.value) {
+      event.preventDefault(); // inside a dialog, don't close it
+      input.value = "";
+      render();
+    }
+  });
 }
 
 function clearFilter() {
@@ -656,23 +699,21 @@ function clearFilter() {
 }
 
 function initRecipeFilter() {
-  const input = document.getElementById("recipe-filter-input");
-  input.addEventListener("input", renderFilterSuggestions);
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const [first] = renderFilterSuggestions();
-      if (first) addFilterItem(first);
-    } else if (event.key === "Escape") {
-      input.value = "";
-      renderFilterSuggestions();
-    }
-  });
-  // Tapping anywhere else closes the suggestions.
+  initItemSearch(
+    "recipe-filter-input",
+    "recipe-filter-suggestions",
+    (key) => recipeFilter.items.has(key),
+    (item) => {
+      recipeFilter.items.set(itemKey(item), item);
+      renderRecipes();
+    },
+  );
+  // Tapping anywhere else closes any open suggestions.
   document.addEventListener("click", (event) => {
-    if (!event.target.closest(".filter-search")) {
-      document.getElementById("recipe-filter-suggestions").hidden = true;
-    }
+    const search = event.target.closest(".filter-search");
+    document.querySelectorAll(".filter-suggestions").forEach((list) => {
+      if (!search || !search.contains(list)) list.hidden = true;
+    });
   });
   document.getElementById("recipe-filter-categories").addEventListener("change", () => {
     recipeFilter.categoryIds.clear();
@@ -690,74 +731,175 @@ function hostname(url) {
   }
 }
 
-/** Fetch a recipe and show it in the detail dialog. */
+/** Fetch a recipe and show it in the recipe dialog. */
 async function openRecipe(id) {
-  const errorBox = document.getElementById("recipes-error");
-  let recipe;
   try {
-    recipe = await api("GET", `/api/recipes/${id}`);
-  } catch (err) {
-    errorBox.textContent = `Couldn't open recipe: ${err.message}`;
-    errorBox.hidden = false;
-    return;
-  }
-  openRecipeId = recipe.id;
-
-  renderCategoryBadges(recipe, document.getElementById("recipe-badges"));
-  document.getElementById("recipe-title").textContent = recipe.name;
-
-  const link = document.getElementById("recipe-url");
-  link.hidden = recipe.kind !== "link";
-  if (recipe.kind === "link") link.href = recipe.url; // server only accepts http(s)
-  else link.removeAttribute("href");
-
-  const list = document.getElementById("recipe-ingredients");
-  list.replaceChildren();
-  for (const component of recipe.components) {
-    const item = el("li", "recipe-ingredient");
-    if (component.type === "recipe") {
-      // A recipe inside this one (e.g. a sauce): tap to read it.
-      const open = el("button", "sub-recipe-btn");
-      open.type = "button";
-      open.append(
-        el("span", null, SUB_RECIPE),
-        renderIngredientLabel(component),
-        el("span", "sub-recipe-arrow", "›"),
-      );
-      open.addEventListener("click", () => openRecipe(component.id));
-      item.append(open);
-    } else {
-      item.append(renderIngredientLabel(component));
-    }
-    list.append(item);
-  }
-  document.getElementById("recipe-ingredients-field").hidden = recipe.components.length === 0;
-
-  const notes = document.getElementById("recipe-notes");
-  notes.textContent = recipe.notes || "No notes";
-  notes.classList.toggle("empty", !recipe.notes);
-
-  resetDeleteButton("recipe-delete");
-  showDialogError(null, "recipe-error");
-  const dialog = document.getElementById("recipe-dialog");
-  if (!dialog.open) dialog.showModal(); // already open when following a sub-recipe
-}
-
-/** Edit any recipe: manual ones in the builder, links in the link dialog. */
-async function editRecipe(id, returnTo = null) {
-  let recipe;
-  try {
-    recipe = await api("GET", `/api/recipes/${id}`);
+    shownRecipe = await api("GET", `/api/recipes/${id}`);
   } catch (err) {
     showToast(`Couldn't open recipe: ${err.message}`);
     return;
   }
-  if (recipe.kind === "link") {
-    openLinkDialog(recipe);
-  } else {
-    setView("ingredients");
-    startBuilder(recipe, returnTo);
+  editingIngredients = false;
+  document.getElementById("recipe-add-input").value = "";
+  document.getElementById("recipe-add-suggestions").hidden = true;
+  resetDeleteButton("recipe-delete");
+  showDialogError(null, "recipe-error");
+  renderRecipeDialog();
+  const dialog = document.getElementById("recipe-dialog");
+  if (!dialog.open) dialog.showModal(); // already open when following a sub-recipe
+}
+
+/** Fill the recipe dialog from shownRecipe; every part of it is editable. */
+function renderRecipeDialog() {
+  const recipe = shownRecipe;
+
+  // A recipe needs a category, so the last one can't be unticked.
+  renderChips(
+    "recipe-categories",
+    categoryChipOptions(),
+    new Set(recipe.categories.map((c) => c.id)),
+  );
+  document.querySelectorAll("#recipe-categories input").forEach((box) => {
+    box.disabled = box.checked && recipe.categories.length === 1;
+  });
+
+  document.getElementById("recipe-title").textContent = recipe.name;
+
+  document.getElementById("recipe-url-row").hidden = recipe.kind !== "link";
+  const link = document.getElementById("recipe-url");
+  if (recipe.kind === "link") link.href = recipe.url; // server only accepts http(s)
+  else link.removeAttribute("href");
+
+  document.getElementById("recipe-ingredients-field").hidden = recipe.kind !== "manual";
+  document.getElementById("recipe-ingredients-edit").textContent = editingIngredients
+    ? "Done"
+    : "✏️ Edit";
+  document.getElementById("recipe-ingredients-tools").hidden = !editingIngredients;
+  const list = document.getElementById("recipe-ingredients");
+  list.replaceChildren();
+  for (const component of recipe.components) {
+    list.append(renderRecipeComponent(component));
   }
+
+  const notes = document.getElementById("recipe-notes");
+  notes.textContent = recipe.notes || "Tap to add notes…";
+  notes.classList.toggle("empty", !recipe.notes);
+}
+
+/** One ingredient row (✕ to remove while editing); a recipe inside this one opens on tap. */
+function renderRecipeComponent(component) {
+  const item = el("li", "recipe-ingredient");
+  if (component.type === "recipe") {
+    // A recipe inside this one (e.g. a sauce): tap to read it.
+    const open = el("button", "sub-recipe-btn");
+    open.type = "button";
+    open.append(
+      el("span", null, SUB_RECIPE),
+      renderIngredientLabel(component),
+      el("span", "sub-recipe-arrow", "›"),
+    );
+    open.addEventListener("click", () => openRecipe(component.id));
+    item.append(open);
+  } else {
+    item.append(renderIngredientLabel(component));
+  }
+  if (!editingIngredients) return item;
+
+  // A recipe needs an ingredient, so the last one can't be removed.
+  const remove = el("button", "recipe-ingredient-remove", "✕");
+  remove.type = "button";
+  remove.setAttribute("aria-label", `Remove ${component.name}`);
+  remove.disabled = shownRecipe.components.length === 1;
+  remove.addEventListener("click", () => {
+    const key = itemKey(component);
+    saveRecipePatch({
+      components: componentsBody(shownRecipe.components.filter((c) => itemKey(c) !== key)),
+    });
+  });
+  item.append(remove);
+  return item;
+}
+
+/** Save some of the shown recipe's fields, then redraw it from the server's answer. */
+function saveRecipePatch(fields) {
+  const id = shownRecipe.id;
+  const dialog = document.getElementById("recipe-dialog");
+  recipeSaving = recipeSaving.then(async () => {
+    const stillShown = () => dialog.open && shownRecipe.id === id;
+    try {
+      const recipe = await api("PATCH", `/api/recipes/${id}`, fields);
+      recipeChanged = true;
+      if (stillShown()) {
+        shownRecipe = recipe;
+        showDialogError(null, "recipe-error");
+        renderRecipeDialog();
+      }
+      showToast("Saved ✓");
+    } catch (err) {
+      if (stillShown()) {
+        showDialogError(err.message, "recipe-error");
+        renderRecipeDialog(); // undo what the failed change showed
+      } else {
+        showToast(`Couldn't save: ${err.message}`);
+      }
+    }
+  });
+  return recipeSaving;
+}
+
+/**
+ * Swap a shown element for a text box holding value. Leaving it or Enter
+ * (single line only) saves through onSave if it changed; Escape undoes.
+ */
+function editInPlace(display, { value, multiline = false, onSave }) {
+  const input = document.createElement(multiline ? "textarea" : "input");
+  input.className = "inline-edit";
+  input.value = value;
+  // Same look and spot as the text it replaces, so nothing jumps.
+  const style = getComputedStyle(display);
+  input.style.font = style.font;
+  input.style.margin = style.margin;
+
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    input.replaceWith(display);
+    if (save && input.value.trim() !== value.trim()) onSave(input.value);
+  };
+  const grow = () => {
+    input.style.height = "auto";
+    input.style.height = `${input.scrollHeight + 4}px`;
+  };
+  input.addEventListener("blur", () => finish(true));
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault(); // undo the edit, don't close the dialog
+      finish(false);
+      display.focus();
+    } else if (event.key === "Enter" && !multiline) {
+      event.preventDefault();
+      finish(true);
+    }
+  });
+  if (multiline) input.addEventListener("input", grow);
+
+  display.replaceWith(input);
+  if (multiline) grow();
+  input.focus();
+}
+
+/** Tap (or Enter on) an element to edit it in place. */
+function makeEditable(id, options) {
+  const display = document.getElementById(id);
+  const start = () => editInPlace(display, options());
+  display.addEventListener("click", start);
+  display.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      start();
+    }
+  });
 }
 
 /** First tap arms the button, second tap deletes. */
@@ -769,30 +911,19 @@ async function deleteRecipe() {
     return;
   }
   try {
-    await api("DELETE", `/api/recipes/${openRecipeId}`);
+    await api("DELETE", `/api/recipes/${shownRecipe.id}`);
+    recipeChanged = true;
     document.getElementById("recipe-dialog").close();
-    await Promise.all([loadRecipes(), loadIngredients()]);
   } catch (err) {
     resetDeleteButton("recipe-delete");
     showDialogError(err.message, "recipe-error");
   }
 }
 
-let editingLink = null; // null while adding, the link recipe while editing
-
-/** Open the link dialog; pass a link recipe to edit it. */
-function openLinkDialog(recipe = null) {
-  editingLink = recipe;
+/** Open the dialog for adding a link recipe. */
+function openLinkDialog() {
   document.getElementById("link-form").reset();
-  document.getElementById("link-dialog-title").textContent = recipe
-    ? "Edit link recipe 🔗"
-    : "Add link recipe 🔗";
-  if (recipe) {
-    document.getElementById("link-name").value = recipe.name;
-    document.getElementById("link-url").value = recipe.url;
-    document.getElementById("link-notes").value = recipe.notes || "";
-  }
-  renderChips("link-categories", categoryChipOptions(), selectedCategoryIds(recipe));
+  renderChips("link-categories", categoryChipOptions(), defaultCategoryIds());
   showDialogError(null, "link-error");
   document.getElementById("link-dialog").showModal();
   document.getElementById("link-name").focus();
@@ -810,9 +941,7 @@ async function saveLink(event) {
   const save = document.getElementById("link-save");
   save.disabled = true;
   try {
-    const recipe = editingLink
-      ? await api("PUT", `/api/recipes/${editingLink.id}`, body)
-      : await api("POST", "/api/recipes", body);
+    const recipe = await api("POST", "/api/recipes", body);
     document.getElementById("link-dialog").close();
     await Promise.all([loadRecipes(), loadIngredients()]);
     showToast(`“${recipe.name}” saved! 🔗`);
@@ -829,14 +958,57 @@ function initRecipes() {
   document
     .getElementById("link-cancel")
     .addEventListener("click", () => document.getElementById("link-dialog").close());
-  document.getElementById("recipe-edit").addEventListener("click", () => {
-    document.getElementById("recipe-dialog").close();
-    editRecipe(openRecipeId, "recipes"); // come back here once saved
+
+  // Everything on the recipe dialog saves as soon as it changes.
+  makeEditable("recipe-title", () => ({
+    value: shownRecipe.name,
+    onSave: (name) => saveRecipePatch({ name }),
+  }));
+  makeEditable("recipe-notes", () => ({
+    value: shownRecipe.notes || "",
+    multiline: true,
+    onSave: (notes) => saveRecipePatch({ notes }),
+  }));
+  document.getElementById("recipe-url-edit").addEventListener("click", () => {
+    editInPlace(document.getElementById("recipe-url-row"), {
+      value: shownRecipe.url,
+      onSave: (url) => saveRecipePatch({ url }),
+    });
   });
+  document.getElementById("recipe-categories").addEventListener("change", () => {
+    saveRecipePatch({ category_ids: checkedChipIds("recipe-categories") });
+  });
+  document.getElementById("recipe-ingredients-edit").addEventListener("click", () => {
+    editingIngredients = !editingIngredients;
+    renderRecipeDialog();
+    if (editingIngredients) document.getElementById("recipe-add-input").focus();
+  });
+  initItemSearch(
+    "recipe-add-input",
+    "recipe-add-suggestions",
+    // Already in it, or the recipe itself.
+    (key) =>
+      key === `recipe:${shownRecipe.id}` || shownRecipe.components.some((c) => itemKey(c) === key),
+    (item) => saveRecipePatch({ components: componentsBody([...shownRecipe.components, item]) }),
+  );
+  document.getElementById("recipe-pick").addEventListener("click", () => {
+    const recipe = shownRecipe;
+    const returnTo = localStorage.getItem(VIEW_KEY) || "recipes";
+    document.getElementById("recipe-dialog").close();
+    setView("ingredients");
+    startBuilder(recipe, returnTo);
+  });
+
   document.getElementById("recipe-delete").addEventListener("click", deleteRecipe);
-  document
-    .getElementById("recipe-close")
-    .addEventListener("click", () => document.getElementById("recipe-dialog").close());
+  const dialog = document.getElementById("recipe-dialog");
+  document.getElementById("recipe-close").addEventListener("click", () => dialog.close());
+  // Once closed (and any last save is done), refresh what the change shows up in.
+  dialog.addEventListener("close", async () => {
+    await recipeSaving;
+    if (!recipeChanged) return;
+    recipeChanged = false;
+    await Promise.all([loadRecipes(), loadIngredients()]);
+  });
 }
 
 function init() {
