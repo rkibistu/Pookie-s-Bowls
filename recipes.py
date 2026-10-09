@@ -11,6 +11,7 @@ business).
 
 from urllib.parse import urlsplit
 
+import favorites
 from errors import NOT_FOUND, RuleError
 
 FIELDS = ("name", "url", "notes", "category_ids", "components")
@@ -20,20 +21,17 @@ FIELDS = ("name", "url", "notes", "category_ids", "components")
 
 
 def get(conn, recipe_id):
-    """One recipe with its categories, components and hearts."""
+    """One recipe with its categories, components and favorites."""
     row = _row(conn, recipe_id)
-    favorites = {
-        "ingredient": favorites_by(conn, "ingredient_id"),
-        "recipe": favorites_by(conn, "recipe_id"),
-    }
+    favorited = favorites.by_item(conn)
     components = _components(conn, recipe_id).get(recipe_id, [])
     for c in components:
-        c["favorites"] = favorites[c["type"]].get(c["id"], [])
+        c["favorites"] = favorited.get((c["type"], c["id"]), [])
     return {
         **dict(row),
         "categories": _categories(conn, recipe_id).get(recipe_id, []),
         "components": components,
-        "favorites": favorites["recipe"].get(recipe_id, []),
+        "favorites": favorited.get(("recipe", recipe_id), []),
     }
 
 
@@ -64,7 +62,7 @@ def listed_sections(conn):
         )
     ]
     by_id = {s["id"]: s for s in sections}
-    favorites = favorites_by(conn, "recipe_id")
+    favorited = favorites.by_item(conn)
     for r in conn.execute(
         "SELECT l.category_id, r.id, r.name FROM recipe_category_links l "
         "JOIN recipes r ON r.id = l.recipe_id "
@@ -72,7 +70,11 @@ def listed_sections(conn):
     ):
         if r["category_id"] in by_id:
             by_id[r["category_id"]]["recipes"].append(
-                {"id": r["id"], "name": r["name"], "favorites": favorites.get(r["id"], [])}
+                {
+                    "id": r["id"],
+                    "name": r["name"],
+                    "favorites": favorited.get(("recipe", r["id"]), []),
+                }
             )
     return sections
 
@@ -85,20 +87,6 @@ def _row(conn, recipe_id):
     if row is None:
         raise RuleError("Recipe not found.", NOT_FOUND)
     return row
-
-
-def favorites_by(conn, column):
-    """Who has favorited each item, "me" before "her": {item id: [person]}.
-
-    column is "ingredient_id" or "recipe_id"; ingredients.py uses it too.
-    """
-    favorites = {}
-    for r in conn.execute(
-        f"SELECT {column} AS item_id, person FROM favorites "
-        f"WHERE {column} IS NOT NULL ORDER BY person DESC"
-    ):
-        favorites.setdefault(r["item_id"], []).append(r["person"])
-    return favorites
 
 
 def _categories(conn, recipe_id=None):

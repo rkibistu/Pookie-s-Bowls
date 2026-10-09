@@ -14,6 +14,14 @@ _Avoid_: item (that also covers listed recipes)
 One of the fixed groups an ingredient is shown in on the Ingredients page (Protein, Base…). An ingredient is in at least one, and can be in several.
 _Avoid_: section, kind
 
+**Item**:
+An ingredient or a recipe, told apart by its type. It is what gets picked, put inside a recipe, and favorited.
+_Avoid_: thing, entry
+
+**Favorite**:
+One person's 💜 (me) or 💚 (her) on an item. The screen shows it as a heart.
+_Avoid_: heart, like
+
 ### Building recipes
 
 **Listed recipe**:

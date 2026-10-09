@@ -9,8 +9,8 @@ ignoring case, and at least one ingredient category.
 
 import sqlite3
 
+import favorites
 from errors import DUPLICATE, NOT_FOUND, RuleError
-from recipes import favorites_by
 
 FIELDS = ("name", "category_ids")
 
@@ -27,13 +27,13 @@ def by_category(conn):
     ]
     by_id = {c["id"]: c for c in categories}
     links = _category_ids(conn)
-    favorites = favorites_by(conn, "ingredient_id")
+    favorited = favorites.by_item(conn)
     for r in conn.execute("SELECT id, name FROM ingredients ORDER BY name COLLATE NOCASE"):
         ingredient = {
             "id": r["id"],
             "name": r["name"],
             "category_ids": links.get(r["id"], []),
-            "favorites": favorites.get(r["id"], []),
+            "favorites": favorited.get(("ingredient", r["id"]), []),
         }
         for category_id in ingredient["category_ids"]:
             by_id[category_id]["ingredients"].append(ingredient)

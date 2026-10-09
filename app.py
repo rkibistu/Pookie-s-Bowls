@@ -6,6 +6,7 @@ from flask import Flask, jsonify, render_template, request
 
 import db
 import errors
+import favorites
 import ingredients
 import recipes
 
@@ -65,50 +66,16 @@ def delete_ingredient(ingredient_id):
 
 # ---- Favorites -----------------------------------------------------------
 
-PEOPLE = ("me", "her")
 
-
-def _set_favorite(column, item_id, person, on):
-    """Add or remove one person's favorite on an ingredient or recipe."""
-    if person not in PEOPLE:
-        raise errors.RuleError("person must be 'me' or 'her'.")
-    conn = db.get_db()
-    with conn:
-        if on:
-            conn.execute(
-                f"INSERT OR IGNORE INTO favorites (person, {column}) VALUES (?, ?)",
-                (person, item_id),
-            )
-        else:
-            conn.execute(
-                f"DELETE FROM favorites WHERE person = ? AND {column} = ?",
-                (person, item_id),
-            )
+@app.route(
+    "/api/<any(ingredients, recipes):kind>/<int:item_id>/favorites/<person>",
+    methods=["PUT", "DELETE"],
+)
+def set_favorite(kind, item_id, person):
+    """PUT adds one person's favorite on an ingredient or recipe, DELETE removes it."""
+    item = {"type": kind.removesuffix("s"), "id": item_id}
+    favorites.set(db.get_db(), item, person, request.method == "PUT")
     return "", 204
-
-
-@app.put("/api/ingredients/<int:ingredient_id>/favorites/<person>")
-def add_favorite(ingredient_id, person):
-    ingredients.get(db.get_db(), ingredient_id)  # 404 if missing
-    return _set_favorite("ingredient_id", ingredient_id, person, True)
-
-
-@app.delete("/api/ingredients/<int:ingredient_id>/favorites/<person>")
-def remove_favorite(ingredient_id, person):
-    ingredients.get(db.get_db(), ingredient_id)  # 404 if missing
-    return _set_favorite("ingredient_id", ingredient_id, person, False)
-
-
-@app.put("/api/recipes/<int:recipe_id>/favorites/<person>")
-def add_recipe_favorite(recipe_id, person):
-    recipes.get(db.get_db(), recipe_id)  # 404 if missing
-    return _set_favorite("recipe_id", recipe_id, person, True)
-
-
-@app.delete("/api/recipes/<int:recipe_id>/favorites/<person>")
-def remove_recipe_favorite(recipe_id, person):
-    recipes.get(db.get_db(), recipe_id)  # 404 if missing
-    return _set_favorite("recipe_id", recipe_id, person, False)
 
 
 # ---- Recipes -------------------------------------------------------------
