@@ -2,10 +2,11 @@
 // recipe category its new recipes start in, and its sections in one ↑/↓
 // list — ingredient sections (rename, delete, add) mixed with the recipe
 // categories it lists (tick to list, untick to unlist). Each change saves as
-// soon as it's made.
+// soon as it's made. Also the New station dialog, and deleting a station.
 
 import { catalog } from "./catalog.js";
-import { el, showDialogError } from "./dom.js";
+import { el, resetDeleteButton, showDialogError, showToast } from "./dom.js";
+import { showStation } from "./station.js";
 
 let armedId = null; // the section whose 🗑 was tapped once, if any
 
@@ -19,6 +20,7 @@ function render() {
   setUnlessFocused("station-name", station.name);
   renderRecipeCategorySelect(station);
   renderSectionRows(station);
+  document.getElementById("station-delete").hidden = catalog.stations().length < 2;
 
   if (focused) document.querySelector(`#station-dialog [data-focus-key="${focused}"]`)?.focus();
 }
@@ -179,8 +181,61 @@ async function addSection(event) {
   if (await run(() => catalog.addSection(station.id, { name: name.value }))) name.value = "";
 }
 
+/** First tap arms the button, second tap deletes; the last station can't go. */
+async function deleteStation() {
+  const del = document.getElementById("station-delete");
+  if (!del.dataset.armed) {
+    del.dataset.armed = "1";
+    del.textContent = "Really delete?";
+    return;
+  }
+  const station = catalog.currentStation();
+  try {
+    await catalog.deleteStation(station.id);
+    document.getElementById("station-dialog").close();
+    showToast(`${station.emoji} ${station.name} deleted`);
+  } catch (err) {
+    showDialogError(err.message, "station-dialog-error");
+  } finally {
+    resetStationDelete();
+  }
+}
+
+function resetStationDelete() {
+  resetDeleteButton("station-delete");
+  document.getElementById("station-delete").textContent = "Delete station";
+}
+
+function openNewStationDialog() {
+  document.getElementById("new-station-form").reset();
+  showDialogError(null, "new-station-error");
+  document.getElementById("new-station-dialog").showModal();
+  document.getElementById("new-station-emoji").focus();
+}
+
+/** Create it, show it, and open its Station dialog to give it sections. */
+async function createStation(event) {
+  event.preventDefault();
+  const save = document.getElementById("new-station-save");
+  save.disabled = true;
+  try {
+    const station = await catalog.createStation({
+      name: document.getElementById("new-station-name").value,
+      emoji: document.getElementById("new-station-emoji").value,
+    });
+    document.getElementById("new-station-dialog").close();
+    showStation(station.id);
+    openStationDialog();
+  } catch (err) {
+    showDialogError(err.message, "new-station-error");
+  } finally {
+    save.disabled = false;
+  }
+}
+
 function openStationDialog() {
   armedId = null;
+  resetStationDelete();
   showDialogError(null, "station-dialog-error");
   document.getElementById("section-add-name").value = "";
   document.getElementById("station-emoji").value = "";
@@ -204,4 +259,11 @@ export function initStationDialog() {
   document.getElementById("section-add-form").addEventListener("submit", addSection);
   document.getElementById("station-btn").addEventListener("click", openStationDialog);
   document.getElementById("station-close").addEventListener("click", () => dialog.close());
+  document.getElementById("station-delete").addEventListener("click", deleteStation);
+
+  document.getElementById("new-station-btn").addEventListener("click", openNewStationDialog);
+  document.getElementById("new-station-form").addEventListener("submit", createStation);
+  document
+    .getElementById("new-station-cancel")
+    .addEventListener("click", () => document.getElementById("new-station-dialog").close());
 }

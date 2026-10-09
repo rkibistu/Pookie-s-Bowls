@@ -176,3 +176,20 @@ test("a failed save says why and leaves the lists as they were", async () => {
   await catalog.deleteRecipe(7); // the next save still goes through
   assert.equal(redraws, 1);
 });
+
+test("the station shown is the one selected, or the first when it's gone", async () => {
+  const server = fakeServer();
+  server.data["/api/stations"].stations.push({ id: 2, name: "Burger", emoji: "🍔", sections: [] });
+  const catalog = createCatalog({ api: server.api });
+  await catalog.reload();
+  let redraws = 0;
+  catalog.onChange(() => redraws++);
+
+  catalog.selectStation(2);
+  assert.equal(catalog.currentStation().name, "Burger");
+  assert.equal(redraws, 1);
+
+  server.data["/api/stations"].stations.pop();
+  await catalog.reload();
+  assert.equal(catalog.currentStation().name, "Poke");
+});

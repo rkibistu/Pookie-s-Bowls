@@ -71,6 +71,18 @@ def list_stations():
     return jsonify(stations=stations.list_all(db.get_db()))
 
 
+@app.post("/api/stations")
+def create_station():
+    return jsonify(stations.create(db.get_db(), request.get_json(silent=True))), 201
+
+
+@app.delete("/api/stations/<int:station_id>")
+def delete_station(station_id):
+    """Its sections go with it; their ingredients stay in the catalog."""
+    stations.delete(db.get_db(), station_id)
+    return "", 204
+
+
 @app.patch("/api/stations/<int:station_id>")
 def change_station(station_id):
     """Change only the fields sent (name, emoji, recipe_category_id)."""

@@ -3,9 +3,11 @@
 
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
 const VIEW_KEY = "pookie-view"; // "station" | "recipes"
+const STATION_KEY = "pookie-station"; // the id of the station used last
 const VIEWS = ["station", "recipes"];
 
 const identityListeners = [];
+const viewListeners = [];
 
 /** Call listener whenever the identity changes. */
 export function onIdentityChange(listener) {
@@ -26,15 +28,30 @@ export function currentIdentity() {
   return document.documentElement.dataset.identity;
 }
 
+/** Call listener whenever the view changes (station buttons highlight themselves). */
+export function onViewChange(listener) {
+  viewListeners.push(listener);
+}
+
 /** Show one view and highlight its nav button. */
 export function setView(view) {
   localStorage.setItem(VIEW_KEY, view);
   document.querySelectorAll(".view").forEach((section) => {
     section.hidden = section.id !== `view-${view}`;
   });
-  document.querySelectorAll(".nav-btn").forEach((btn) => {
+  document.querySelectorAll(".nav-btn[data-view]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
+  viewListeners.forEach((listener) => listener());
+}
+
+/** The id of the station used last on this device, or null. */
+export function savedStationId() {
+  return Number(localStorage.getItem(STATION_KEY)) || null;
+}
+
+export function saveStationId(id) {
+  localStorage.setItem(STATION_KEY, String(id));
 }
 
 /** The view being shown: "station" | "recipes". */
@@ -43,7 +60,8 @@ export function currentView() {
   return VIEWS.includes(view) ? view : "station";
 }
 
-/** Restore the saved identity (default: "me") and view, and wire their buttons. */
+/** Restore the saved identity (default: "me") and view, and wire their buttons.
+ * Station buttons come and go with the stations; station.js draws them. */
 export function initShell() {
   setIdentity(localStorage.getItem(IDENTITY_KEY) || "me");
   document.querySelectorAll(".identity-btn").forEach((btn) => {
@@ -51,7 +69,7 @@ export function initShell() {
   });
 
   setView(currentView());
-  document.querySelectorAll(".nav-btn").forEach((btn) => {
+  document.querySelectorAll(".nav-btn[data-view]").forEach((btn) => {
     btn.addEventListener("click", () => setView(btn.dataset.view));
   });
 }

@@ -97,6 +97,35 @@ def _section(conn, section_id):
 # ---- Writing: the station ------------------------------------------------
 
 
+def create(conn, fields):
+    """Save a new station at the end, with no sections; name and emoji are
+    required, and its new recipes start in the first recipe category."""
+    if not isinstance(fields, dict):
+        raise RuleError("Expected a JSON object.")
+    name = _parse_name(fields.get("name"), "Please give the station a name.")
+    emoji = _parse_emoji(fields.get("emoji"))
+    try:
+        with conn:
+            cur = conn.execute(
+                "INSERT INTO stations (name, emoji, position) "
+                "VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM stations))",
+                (name, emoji),
+            )
+    except sqlite3.IntegrityError:
+        raise _duplicate_station()
+    return get(conn, cur.lastrowid)
+
+
+def delete(conn, station_id):
+    """Delete a station and its sections; ingredients only in those sections
+    become orphans. The last station can't be deleted."""
+    get(conn, station_id)  # not found?
+    if conn.execute("SELECT COUNT(*) FROM stations").fetchone()[0] == 1:
+        raise RuleError("The last station can't be deleted; rename it instead.")
+    with conn:
+        conn.execute("DELETE FROM stations WHERE id = ?", (station_id,))
+
+
 def change(conn, station_id, fields):
     """Change only the fields given: name, emoji, recipe_category_id (None:
     new recipes start in the first recipe category)."""
@@ -118,7 +147,7 @@ def change(conn, station_id, fields):
                     (*station.values(), station_id),
                 )
         except sqlite3.IntegrityError:
-            raise RuleError("A station with that name already exists.", DUPLICATE)
+            raise _duplicate_station()
     return get(conn, station_id)
 
 
@@ -193,6 +222,11 @@ def reorder_sections(conn, station_id, section_ids):
 
 def _section_of(conn, station_id, section_id):
     return next(s for s in get(conn, station_id)["sections"] if s["id"] == section_id)
+
+
+def _duplicate_station():
+    """Station names are unique ignoring case; the database says when one is taken."""
+    return RuleError("A station with that name already exists.", DUPLICATE)
 
 
 def _duplicate(column):

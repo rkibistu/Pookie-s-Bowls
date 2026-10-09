@@ -220,3 +220,66 @@ def test_a_new_section_order_must_list_every_section_once(conn, poke, order):
         "section_ids must list every section of the station once.",
     )
     assert sections(conn, poke) == before
+
+
+def test_a_new_station_goes_at_the_end_with_no_sections(conn):
+    burger = stations.create(conn, {"name": " Burger ", "emoji": "🍔"})
+
+    assert burger == {
+        "id": burger["id"],
+        "name": "Burger",
+        "emoji": "🍔",
+        "recipe_category_id": None,
+        "sections": [],
+    }
+    assert [s["name"] for s in stations.list_all(conn)] == ["Poke", "Burger"]
+
+
+@pytest.mark.parametrize(
+    "fields, kind, message",
+    [
+        ({"name": "", "emoji": "🍔"}, INVALID, "Please give the station a name."),
+        ({"name": "Burger"}, INVALID, "Please give the station an emoji."),
+        ({"name": "POKE", "emoji": "🍔"}, DUPLICATE, "A station with that name already exists."),
+    ],
+)
+def test_a_new_station_is_refused_when_a_field_is_wrong(conn, fields, kind, message):
+    assert refused(lambda: stations.create(conn, fields)) == (kind, message)
+    assert len(stations.list_all(conn)) == 1
+
+
+def test_an_ingredient_can_be_in_sections_on_two_stations(conn, poke, section):
+    burger = stations.create(conn, {"name": "Burger", "emoji": "🍔"})["id"]
+    patty = stations.add_section(conn, burger, {"name": "Patty"})["id"]
+
+    salmon = ingredients.create(conn, {"name": "Salmon", "section_ids": [section("Protein"), patty]})
+
+    assert [i["name"] for i in stations.get(conn, burger)["sections"][0]["items"]] == ["Salmon"]
+    assert salmon["section_ids"] == sorted([section("Protein"), patty])
+
+
+def test_two_stations_can_have_sections_with_the_same_name(conn):
+    burger = stations.create(conn, {"name": "Burger", "emoji": "🍔"})["id"]
+
+    assert stations.add_section(conn, burger, {"name": "Protein"})["name"] == "Protein"
+
+
+def test_deleting_a_station_leaves_its_ingredients_as_orphans(conn, poke, ingredient):
+    burger = stations.create(conn, {"name": "Burger", "emoji": "🍔"})["id"]
+    patty = stations.add_section(conn, burger, {"name": "Patty"})["id"]
+    beef = ingredients.create(conn, {"name": "Beef", "section_ids": [patty]})["id"]
+    salmon = ingredient("Salmon")
+
+    stations.delete(conn, burger)
+
+    assert [s["name"] for s in stations.list_all(conn)] == ["Poke"]
+    assert ingredients.get(conn, beef)["section_ids"] == []
+    assert ingredients.get(conn, salmon)["section_ids"] != []
+
+
+def test_the_last_station_cannot_be_deleted(conn, poke):
+    assert refused(lambda: stations.delete(conn, poke)) == (
+        INVALID,
+        "The last station can't be deleted; rename it instead.",
+    )
+    assert refused(lambda: stations.delete(conn, 99)) == (NOT_FOUND, "Station not found.")

@@ -126,3 +126,15 @@ def test_every_ingredient_comes_back_including_orphans(client):
     assert "Seaweed" in names
 
     assert client.delete(f"/api/ingredients/{seaweed.json['id']}").status_code == 204
+
+
+def test_a_station_can_be_created_and_deleted_over_http(client):
+    created = client.post("/api/stations", json={"name": "Burger", "emoji": "🍔"})
+    assert (created.status_code, created.json["sections"]) == (201, [])
+    burger = created.json["id"]
+    assert client.post("/api/stations", json={"name": "burger", "emoji": "🍔"}).status_code == 409
+
+    assert client.delete(f"/api/stations/{burger}").status_code == 204
+    assert client.delete(f"/api/stations/{burger}").status_code == 404
+    [poke] = client.get("/api/stations").json["stations"]
+    assert client.delete(f"/api/stations/{poke['id']}").status_code == 400

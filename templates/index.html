@@ -23,7 +23,9 @@
     </header>
 
     <nav class="app-nav">
-        <button type="button" class="nav-btn" data-view="station" id="station-nav">🥣 Station</button>
+        <div class="station-nav" id="station-nav"></div>
+        <button type="button" class="nav-btn nav-add" id="new-station-btn"
+                title="New station" aria-label="New station">＋</button>
         <button type="button" class="nav-btn" data-view="recipes">📖 Recipes</button>
     </nav>
 
@@ -236,9 +238,31 @@
         <p class="form-error" id="station-dialog-error" hidden></p>
 
         <div class="dialog-actions">
+            <button type="button" class="danger-btn" id="station-delete">Delete station</button>
             <span class="spacer"></span>
             <button type="button" class="secondary-btn" id="station-close">Close</button>
         </div>
+    </dialog>
+
+    <dialog class="dialog" id="new-station-dialog">
+        <form id="new-station-form" novalidate>
+            <h2>New station ✨</h2>
+            <p class="dialog-hint">A page set up for picking one kind of recipe, like 🍔 Burger.</p>
+            <div class="category-row station-name-row">
+                <input type="text" class="category-emoji" id="new-station-emoji" maxlength="8"
+                       autocomplete="off" placeholder="🍔" aria-label="New station's emoji">
+                <input type="text" class="category-name" id="new-station-name" maxlength="40"
+                       autocomplete="off" placeholder="Name…" aria-label="New station's name">
+            </div>
+
+            <p class="form-error" id="new-station-error" hidden></p>
+
+            <div class="dialog-actions">
+                <span class="spacer"></span>
+                <button type="button" class="secondary-btn" id="new-station-cancel">Cancel</button>
+                <button type="submit" class="primary-btn" id="new-station-save">Create</button>
+            </div>
+        </form>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

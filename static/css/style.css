@@ -117,7 +117,25 @@ body {
 .app-nav {
     display: flex;
     gap: 10px;
-    padding: 16px 20px 0;
+    padding: 16px 20px 8px;
+    margin-bottom: -8px; /* the padding only keeps the buttons' shadows unclipped */
+    overflow-x: auto; /* many stations: the row scrolls sideways */
+}
+
+/* The station buttons sit in the nav row like the others. */
+.station-nav {
+    display: contents;
+}
+
+.nav-btn {
+    flex: none;
+    white-space: nowrap;
+}
+
+.nav-add {
+    padding: 10px 14px;
+    color: var(--muted);
+    font-weight: 700;
 }
 
 .nav-btn {
@@ -542,8 +560,10 @@ body {
 }
 
 
-/* Selection mode: only picking is possible, so hide everything that edits or navigates. */
-body.selecting .app-nav,
+/* Selection mode: only picking is possible, so hide everything that edits or
+   leaves the stations (switching stations is fine: the picks stay). */
+body.selecting #new-station-btn,
+body.selecting .nav-btn[data-view="recipes"],
 body.selecting #add-ingredient-btn,
 body.selecting #station-btn,
 body.selecting #new-recipe-btn,

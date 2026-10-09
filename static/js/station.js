@@ -9,16 +9,44 @@ import { HEARTS, itemKey, renderItemLabel } from "./items.js";
 import { pickNewRecipe } from "./new-recipe.js";
 import { pickSession } from "./pick-session.js";
 import { openRecipe } from "./recipe-dialog.js";
-import { currentIdentity, onIdentityChange } from "./shell.js";
+import {
+  currentIdentity,
+  currentView,
+  onIdentityChange,
+  onViewChange,
+  saveStationId,
+  savedStationId,
+  setView,
+} from "./shell.js";
 
-/** After the catalog reloads: its error, if any, the nav button, then the list. */
+/** After the catalog reloads: its error, if any, the station buttons, then the list. */
 function catalogChanged() {
   const errorBox = document.getElementById("station-error");
   errorBox.textContent = catalog.loadError() || "";
   errorBox.hidden = !catalog.loadError();
-  const station = catalog.currentStation();
-  if (station) document.getElementById("station-nav").textContent = `${station.emoji} ${station.name}`;
+  renderStationNav();
   renderStation();
+}
+
+/** One nav button per station; the one shown is highlighted while on the station view. */
+function renderStationNav() {
+  const nav = document.getElementById("station-nav");
+  nav.replaceChildren();
+  const current = catalog.currentStation();
+  for (const station of catalog.stations()) {
+    const btn = el("button", "nav-btn", `${station.emoji} ${station.name}`);
+    btn.type = "button";
+    btn.classList.toggle("active", currentView() === "station" && station === current);
+    btn.addEventListener("click", () => showStation(station.id));
+    nav.append(btn);
+  }
+}
+
+/** Show this station (remembered on this device); a pick session keeps its picks. */
+export function showStation(id) {
+  saveStationId(id);
+  catalog.selectStation(id);
+  setView("station");
 }
 
 /** One card per section of the station, in its order. */
@@ -282,7 +310,9 @@ export function initStation() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeRowMenu();
   });
+  catalog.selectStation(savedStationId());
   catalog.onChange(catalogChanged);
+  onViewChange(renderStationNav);
   // Rows show picks, and the hint shows whose heart a double-tap adds.
   pickSession.onChange(renderStation);
   onIdentityChange(renderStation);

@@ -15,6 +15,7 @@ export function createCatalog({ api }) {
   let ingredients = []; // every ingredient A→Z, orphans too, as items
   let recipes = []; // newest first
   let recipeCategories = []; // in their order
+  let selectedStationId = null; // the station being shown; null or gone: the first
   let loadError = null; // what went wrong with the last reload, if anything
   const listeners = [];
   let queue = Promise.resolve(); // saves and reloads run one after another
@@ -83,8 +84,13 @@ export function createCatalog({ api }) {
     onChange: (listener) => listeners.push(listener),
     loadError: () => loadError,
     stations: () => stations,
-    /** The station being shown (for now the only one), or null before the first load. */
-    currentStation: () => stations[0] ?? null,
+    /** The station being shown: the one selected, or the first if it's gone; null before the first load. */
+    currentStation: () => stations.find((s) => s.id === selectedStationId) ?? stations[0] ?? null,
+    /** Show this station; every onChange listener runs. */
+    selectStation(id) {
+      selectedStationId = id;
+      for (const listener of listeners) listener();
+    },
     ingredients: () => ingredients,
     recipes: () => recipes,
     recipeCategories: () => recipeCategories,
@@ -105,6 +111,10 @@ export function createCatalog({ api }) {
     reorderRecipeCategories: (ids) =>
       save("PUT", "/api/recipe-categories/order", { category_ids: ids }),
     deleteRecipeCategory: (id) => save("DELETE", `/api/recipe-categories/${id}`),
+    /** A new station with no sections; resolves to it. */
+    createStation: (fields) => save("POST", "/api/stations", fields),
+    /** Delete a station; its ingredients stay in the catalog. */
+    deleteStation: (id) => save("DELETE", `/api/stations/${id}`),
     /** Change only the fields given (name, emoji, recipe_category_id). */
     changeStation: (id, fields) => save("PATCH", `/api/stations/${id}`, fields),
     /** {name} adds an ingredient section, {recipe_category_id} lists that category. */
