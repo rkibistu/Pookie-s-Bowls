@@ -126,7 +126,7 @@ def test_a_station_and_its_sections_can_be_changed_over_http(client):
 
     ids = [s["id"] for s in client.get("/api/stations").json["stations"][0]["sections"]]
     moved = client.put(
-        f"/api/stations/{poke['id']}/sections/order", json={"section_ids": [nuts, *ids[:-1]]}
+        f"/api/stations/{poke['id']}/sections/order", json={"section_ids": [nuts, *(i for i in ids if i != nuts)]}
     )
     assert (moved.status_code, moved.json["sections"][0]["name"]) == (200, "Seeds")
     assert client.put(f"/api/stations/{poke['id']}/sections/order", json={}).status_code == 400

@@ -236,23 +236,38 @@
                    autocomplete="off" aria-label="Station name">
         </div>
 
-        <label class="field">
-            <span class="field-label">New recipes start as</span>
+        <div class="field">
+            <label class="field-label" for="station-recipe-category">New recipes start as</label>
             <select id="station-recipe-category"></select>
-        </label>
+            <form class="category-row category-add start-category-add" id="start-category-add-form" hidden novalidate>
+                <input type="text" class="category-emoji" id="start-category-add-emoji" maxlength="8"
+                       autocomplete="off" placeholder="🙂" aria-label="New category's emoji">
+                <input type="text" class="category-name" id="start-category-add-name" maxlength="40"
+                       autocomplete="off" placeholder="New recipe category…" aria-label="New category's name">
+                <button type="submit" class="secondary-btn">Add</button>
+                <button type="button" class="icon-btn" id="start-category-add-cancel"
+                        title="Cancel" aria-label="Cancel">✕</button>
+            </form>
+        </div>
 
         <div class="field">
-            <span class="field-label">Sections</span>
-            <p class="dialog-hint">Ingredient sections and ticked recipe categories, in the order they're shown. A ticked category's recipes can be picked into others.</p>
+            <span class="field-label">Ingredient sections</span>
             <ul class="category-rows" id="station-section-rows"></ul>
             <form class="category-row category-add" id="section-add-form" novalidate>
                 <input type="text" class="category-name" id="section-add-name" maxlength="40"
                        autocomplete="off" placeholder="New ingredient section…" aria-label="New section's name">
                 <button type="submit" class="secondary-btn">Add</button>
             </form>
+        </div>
+
+        <hr class="dialog-separator">
+
+        <div class="field">
+            <span class="field-label">Recipe categories</span>
+            <ul class="category-rows" id="station-category-rows"></ul>
             <form class="category-row category-add" id="station-category-add-form" novalidate>
                 <input type="text" class="category-emoji" id="station-category-add-emoji" maxlength="8"
-                       autocomplete="off" placeholder="🍔" aria-label="New category's emoji">
+                       autocomplete="off" placeholder="🙂" aria-label="New category's emoji">
                 <input type="text" class="category-name" id="station-category-add-name" maxlength="40"
                        autocomplete="off" placeholder="New recipe category…" aria-label="New category's name">
                 <button type="submit" class="secondary-btn">Add</button>

@@ -1,9 +1,9 @@
 // The Station dialog: the station being shown, its name and emoji, the
-// recipe category its new recipes start in, and its sections in one ↑/↓
-// list — ingredient sections (rename, delete, add) mixed with the recipe
-// categories it lists (tick to list, untick to unlist) — and a new recipe
-// category, without leaving for the Recipes page. Each change saves as soon
-// as it's made. Also the New station dialog, and deleting a station.
+// recipe category its new recipes start in, its ingredient sections (rename,
+// ↑/↓, delete, add), then the recipe categories it lists (tick to list,
+// untick to unlist, ↑/↓). A new recipe category can be made right here, for
+// new recipes to start in or to list. Each change saves as soon as it's made.
+// Also the New station dialog, and deleting a station.
 
 import { catalog } from "./catalog.js";
 import { el, resetDeleteButton, showDialogError, showToast } from "./dom.js";
@@ -11,6 +11,12 @@ import { attachEmojiPicker } from "./emoji-picker.js";
 import { showStation } from "./station.js";
 
 let armedId = null; // the section whose 🗑 was tapped once, if any
+
+// In the "New recipes start as" dropdown: opens the new category row under it.
+const NEW_CATEGORY = "new";
+
+const ingredientSections = (station) => station.sections.filter((s) => s.kind === "ingredients");
+const listedCategories = (station) => station.sections.filter((s) => s.kind === "recipes");
 
 /** Everything in the dialog, from the station as stored, keeping focus where it was. */
 function render() {
@@ -21,7 +27,8 @@ function render() {
   setUnlessFocused("station-emoji", station.emoji);
   setUnlessFocused("station-name", station.name);
   renderRecipeCategorySelect(station);
-  renderSectionRows(station);
+  renderIngredientSectionRows(station);
+  renderCategoryRows(station);
   document.getElementById("station-delete").hidden = catalog.stations().length < 2;
 
   if (focused) document.querySelector(`#station-dialog [data-focus-key="${focused}"]`)?.focus();
@@ -38,32 +45,39 @@ function renderRecipeCategorySelect(station) {
   for (const category of catalog.recipeCategories()) {
     select.append(new Option(`${category.emoji} ${category.name}`, String(category.id)));
   }
+  select.append(new Option("＋ New category…", NEW_CATEGORY));
   select.value = station.recipe_category_id == null ? "" : String(station.recipe_category_id);
 }
 
-/** The station's sections in order, then the recipe categories it doesn't list. */
-function renderSectionRows(station) {
+/** The station's ingredient sections, in order. */
+function renderIngredientSectionRows(station) {
+  const sections = ingredientSections(station);
   const list = document.getElementById("station-section-rows");
   list.replaceChildren();
-  const { sections } = station;
   sections.forEach((section, index) => {
     const row = el("li", "category-row section-row");
-    if (section.kind === "ingredients") {
-      row.append(nameInput(section), ...moveButtons(station, index), deleteButton(section));
-    } else {
-      row.append(
-        listedBox(`${section.emoji} ${section.name}`, true, () =>
-          catalog.deleteSection(section.id),
-        ),
-        ...moveButtons(station, index),
-      );
-    }
+    row.append(nameInput(section), ...moveButtons(station, sections, index), deleteButton(section));
+    list.append(row);
+  });
+}
+
+/** The recipe categories the station lists, in order, then the ones it doesn't. */
+function renderCategoryRows(station) {
+  const listed = listedCategories(station);
+  const list = document.getElementById("station-category-rows");
+  list.replaceChildren();
+  listed.forEach((section, index) => {
+    const row = el("li", "category-row section-row");
+    row.append(
+      listedBox(`${section.emoji} ${section.name}`, true, () => catalog.deleteSection(section.id)),
+      ...moveButtons(station, listed, index),
+    );
     list.append(row);
   });
 
-  const listed = new Set(sections.map((s) => s.recipe_category_id).filter((id) => id != null));
+  const listedIds = new Set(listed.map((s) => s.recipe_category_id));
   for (const category of catalog.recipeCategories()) {
-    if (listed.has(category.id)) continue;
+    if (listedIds.has(category.id)) continue;
     const row = el("li", "category-row section-row unlisted");
     row.append(
       listedBox(`${category.emoji} ${category.name}`, false, () =>
@@ -113,17 +127,23 @@ function iconButton(text, label, disabled, onClick) {
   return btn;
 }
 
-/** ↑ and ↓: swap the section at index with its neighbour. */
-function moveButtons(station, index) {
-  const { name } = station.sections[index];
+/**
+ * ↑ and ↓: swap the section at index with its neighbour in group (the
+ * ingredient sections, or the listed categories); ingredient sections stay
+ * first.
+ */
+function moveButtons(station, group, index) {
+  const { name } = group[index];
   const move = (step) => {
-    const ids = station.sections.map((s) => s.id);
+    const ids = group.map((s) => s.id);
     [ids[index], ids[index + step]] = [ids[index + step], ids[index]];
-    run(() => catalog.reorderSections(station.id, ids));
+    const others = station.sections.filter((s) => !group.includes(s)).map((s) => s.id);
+    const order = group[index].kind === "ingredients" ? [...ids, ...others] : [...others, ...ids];
+    run(() => catalog.reorderSections(station.id, order));
   };
   return [
     iconButton("↑", `Move ${name} up`, index === 0, () => move(-1)),
-    iconButton("↓", `Move ${name} down`, index === station.sections.length - 1, () => move(1)),
+    iconButton("↓", `Move ${name} down`, index === group.length - 1, () => move(1)),
   ];
 }
 
@@ -183,24 +203,48 @@ async function addSection(event) {
   if (await run(() => catalog.addSection(station.id, { name: name.value }))) name.value = "";
 }
 
-/**
- * A new recipe category, not listed. If the station's new recipes start in
- * "the first recipe category", they start in this one now; a category already
- * chosen stays.
- */
-async function addCategory(event) {
-  event.preventDefault();
-  const form = document.getElementById("station-category-add-form");
+/** A new recipe category from formId's row; then({station, category}) uses it. */
+async function addCategory(formId, then) {
+  const form = document.getElementById(formId);
   const station = catalog.currentStation();
-  const startsInFirst = station.recipe_category_id == null;
   const added = await run(async () => {
     const category = await catalog.createRecipeCategory({
-      name: document.getElementById("station-category-add-name").value,
-      emoji: document.getElementById("station-category-add-emoji").value,
+      name: form.querySelector(".category-name").value,
+      emoji: form.querySelector(".category-emoji").value,
     });
-    if (startsInFirst) await catalog.changeStation(station.id, { recipe_category_id: category.id });
+    await then({ station, category });
   });
   if (added) form.reset();
+  return added;
+}
+
+/** The dropdown's new category: new recipes on this station start in it. */
+async function addStartCategory(event) {
+  event.preventDefault();
+  const added = await addCategory("start-category-add-form", ({ station, category }) =>
+    catalog.changeStation(station.id, { recipe_category_id: category.id }),
+  );
+  if (added) closeStartCategoryRow();
+}
+
+/** The categories part's new category: listed on this station, after the others. */
+function addListedCategory(event) {
+  event.preventDefault();
+  addCategory("station-category-add-form", ({ station, category }) =>
+    catalog.addSection(station.id, { recipe_category_id: category.id }),
+  );
+}
+
+function openStartCategoryRow() {
+  const form = document.getElementById("start-category-add-form");
+  form.hidden = false;
+  form.querySelector(".category-name").focus();
+}
+
+function closeStartCategoryRow() {
+  const form = document.getElementById("start-category-add-form");
+  form.reset();
+  form.hidden = true;
 }
 
 /** First tap arms the button, second tap deletes; the last station can't go. */
@@ -261,6 +305,7 @@ function openStationDialog() {
   showDialogError(null, "station-dialog-error");
   document.getElementById("section-add-name").value = "";
   document.getElementById("station-category-add-form").reset();
+  closeStartCategoryRow();
   document.getElementById("station-emoji").value = "";
   document.getElementById("station-name").value = "";
   render();
@@ -277,11 +322,26 @@ export function initStationDialog() {
   document.getElementById("station-recipe-category").addEventListener("change", (event) => {
     const value = event.target.value;
     const station = catalog.currentStation();
+    if (value === NEW_CATEGORY) {
+      // Show the stored choice until the new category is added.
+      renderRecipeCategorySelect(station);
+      openStartCategoryRow();
+      return;
+    }
     run(() => catalog.changeStation(station.id, { recipe_category_id: value ? Number(value) : null }));
   });
+  document.getElementById("start-category-add-form").addEventListener("submit", addStartCategory);
+  document
+    .getElementById("start-category-add-cancel")
+    .addEventListener("click", closeStartCategoryRow);
   document.getElementById("section-add-form").addEventListener("submit", addSection);
-  document.getElementById("station-category-add-form").addEventListener("submit", addCategory);
-  for (const id of ["station-emoji", "station-category-add-emoji", "new-station-emoji"]) {
+  document.getElementById("station-category-add-form").addEventListener("submit", addListedCategory);
+  for (const id of [
+    "station-emoji",
+    "start-category-add-emoji",
+    "station-category-add-emoji",
+    "new-station-emoji",
+  ]) {
     attachEmojiPicker(document.getElementById(id));
   }
   document.getElementById("station-btn").addEventListener("click", openStationDialog);

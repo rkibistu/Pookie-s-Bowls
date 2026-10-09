@@ -1136,10 +1136,21 @@ body.selecting .ingredient-row.unpickable::after {
     background: var(--surface);
 }
 
-.category-emoji {
+/* An emoji box looks like a square button: tap it for the emoji picker. */
+.category-row input.category-emoji {
     flex: none;
-    width: 3.2em;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 1.3rem;
     text-align: center;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.category-emoji::placeholder {
+    opacity: 0.45;
 }
 
 .category-name {
@@ -1169,6 +1180,20 @@ body.selecting .ingredient-row.unpickable::after {
 
 .category-add input {
     border-color: var(--border);
+}
+
+#station-section-rows .category-row:last-child {
+    border-bottom: none;
+}
+
+.dialog-separator {
+    margin: 4px 0 16px;
+    border: none;
+    border-top: 1px solid var(--border);
+}
+
+.start-category-add {
+    margin: 8px 0 0;
 }
 
 /* ---- Emoji picker ----------------------------------------------------- */

@@ -6,7 +6,8 @@ dicts; a broken rule raises RuleError. Nothing here knows about HTTP.
 A station has a name (unique, see names.py), an emoji, the recipe category
 its new recipes start in (None: the first one), and its sections in order.
 A section is either an ingredient section of its own (a name, unique on the
-station) or a listed recipe category, whose recipes it shows.
+station) or a listed recipe category, whose recipes it shows. Ingredient
+sections always come first, then listed categories, each in their order.
 Deleting a section never touches the ingredients in it: an ingredient in no
 section anywhere is an orphan, and that's fine (see docs/adr/0001).
 """
@@ -24,8 +25,9 @@ STATION_FIELDS = ("name", "emoji", "recipe_category_id")
 
 
 def list_all(conn):
-    """Every station in order, each with its sections in order and their rows:
-    an ingredient section's ingredients, or a listed category's recipes, A→Z."""
+    """Every station in order, each with its sections (ingredient sections,
+    then listed categories, each in order) and their rows: an ingredient
+    section's ingredients, or a listed category's recipes, A→Z."""
     favorited = favorites.by_item(conn)
     stations = [
         {**dict(r), "sections": []}
@@ -39,7 +41,7 @@ def list_all(conn):
         "SELECT s.id, s.station_id, s.name, s.recipe_category_id, c.name AS category_name, "
         "       c.emoji AS category_emoji "
         "FROM sections s LEFT JOIN recipe_categories c ON c.id = s.recipe_category_id "
-        "ORDER BY s.position, s.id"
+        "ORDER BY s.recipe_category_id IS NOT NULL, s.position, s.id"
     ):
         if r["recipe_category_id"] is None:
             section = {"id": r["id"], "kind": "ingredients", "name": r["name"], "items": []}
@@ -158,7 +160,7 @@ def change(conn, station_id, fields):
 
 
 def add_section(conn, station_id, fields):
-    """Add a section at the end of the station: {name} for a new ingredient
+    """Add a section at the end of its kind: {name} for a new ingredient
     section, or {recipe_category_id} to list that recipe category."""
     get(conn, station_id)  # not found?
     if not isinstance(fields, dict) or ("name" in fields) == ("recipe_category_id" in fields):
@@ -211,7 +213,8 @@ def delete_section(conn, section_id):
 
 
 def reorder_sections(conn, station_id, section_ids):
-    """Put every section of the station in the order given; returns the station."""
+    """Put every section of the station in the order given (each kind keeps
+    its own order; ingredient sections still come first); returns the station."""
     get(conn, station_id)  # not found?
     known = sorted(
         r[0] for r in conn.execute("SELECT id FROM sections WHERE station_id = ?", (station_id,))

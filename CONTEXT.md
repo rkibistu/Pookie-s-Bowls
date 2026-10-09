@@ -29,7 +29,7 @@ A page set up for picking one kind of recipe (🥣 Poke, 🍔 Burger), with its 
 _Avoid_: page, board, builder, Ingredients page
 
 **Section**:
-One group of rows on a station, in that station's order. It is either an ingredient section or a listed category, and the two kinds can be mixed in any order.
+One group of rows on a station. It is either an ingredient section or a listed category. Ingredient sections always come first, then listed categories, each kind in its own order.
 _Avoid_: category (on its own), group
 
 **Ingredient section**:

@@ -107,13 +107,13 @@ def test_a_missing_station_or_section_is_not_found(conn):
         assert refused(attempt) == (NOT_FOUND, message)
 
 
-def test_new_sections_go_at_the_end(conn, poke, category):
+def test_new_sections_go_at_the_end_of_their_kind(conn, poke, category):
     added = stations.add_section(conn, poke, {"name": " Nuts "})
     listed = stations.add_section(conn, poke, {"recipe_category_id": category("Soup")})
 
     assert (added["kind"], added["name"], added["items"]) == ("ingredients", "Nuts", [])
     assert (listed["kind"], listed["name"], listed["emoji"]) == ("recipes", "Soup", "🍲")
-    assert sections(conn, poke)[-3:] == ["🥫 Sauce", "Nuts", "🍲 Soup"]
+    assert sections(conn, poke)[-4:] == ["Extras", "Nuts", "🥫 Sauce", "🍲 Soup"]
 
 
 def test_a_section_name_or_listed_category_is_taken_once_per_station(conn, poke, category):
@@ -193,14 +193,18 @@ def test_deleting_a_recipe_category_unlists_it(conn, poke, category):
     assert sections(conn, poke)[-1] == "Extras"
 
 
-def test_ingredient_sections_and_listed_categories_share_one_order(conn, poke):
+def test_ingredient_sections_come_before_listed_categories_each_in_their_order(
+    conn, poke, category
+):
+    stations.add_section(conn, poke, {"recipe_category_id": category("Soup")})
     ids = {s["name"]: s["id"] for s in stations.get(conn, poke)["sections"]}
-    order = [ids[n] for n in ("Base", "Sauce", "Protein", "Fresh Vegetables / Fruits",
+    order = [ids[n] for n in ("Soup", "Base", "Sauce", "Protein", "Fresh Vegetables / Fruits",
                               "Cooked Vegetables / Fruits", "Topping", "Extras")]
 
     stations.reorder_sections(conn, poke, order)
 
-    assert sections(conn, poke)[:3] == ["Base", "🥫 Sauce", "Protein"]
+    assert sections(conn, poke)[:2] == ["Base", "Protein"]
+    assert sections(conn, poke)[-3:] == ["Extras", "🍲 Soup", "🥫 Sauce"]
 
 
 @pytest.mark.parametrize(
