@@ -41,12 +41,11 @@ CREATE TABLE IF NOT EXISTS recipe_categories (
     in_ingredient_list INTEGER NOT NULL DEFAULT 0 CHECK (in_ingredient_list IN (0, 1))
 );
 
--- All recipes. kind is where the recipe comes from: 'manual' (built from
--- components) or 'link' (an external URL). What it is lives in its categories.
+-- All recipes. Each may have a link (url) and/or components; both are
+-- optional. What it is lives in its categories.
 CREATE TABLE IF NOT EXISTS recipes (
     id         INTEGER PRIMARY KEY,
     name       TEXT    NOT NULL,
-    kind       TEXT    NOT NULL CHECK (kind IN ('manual', 'link')),
     url        TEXT,
     notes      TEXT,
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))

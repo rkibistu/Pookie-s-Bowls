@@ -40,7 +40,7 @@
 
         <section class="view" id="view-recipes" hidden>
             <div class="toolbar">
-                <button type="button" class="primary-btn" id="add-link-btn">+ Add link recipe</button>
+                <button type="button" class="primary-btn" id="new-recipe-link-btn">+ New recipe</button>
             </div>
             <p class="load-error" id="recipes-error" hidden></p>
             <section class="filter-panel" id="recipe-filter" aria-label="Filter recipes" hidden>
@@ -93,18 +93,33 @@
         <ul class="build-picks" id="build-picks"></ul>
         <div class="build-tray-actions">
             <button type="button" class="secondary-btn" id="build-cancel">Cancel</button>
-            <button type="button" class="primary-btn" id="build-create" disabled>Create</button>
+            <button type="button" class="primary-btn" id="build-create">Create</button>
         </div>
     </aside>
 
     <dialog class="dialog" id="build-dialog">
         <form id="build-form" novalidate>
-            <h2>Name your recipe ✨</h2>
+            <h2>New recipe ✨</h2>
 
             <label class="field">
                 <span class="field-label">Name</span>
                 <input type="text" id="build-name" maxlength="80" autocomplete="off" required>
             </label>
+
+            <label class="field">
+                <span class="field-label">Link</span>
+                <input type="url" id="build-url" inputmode="url" autocomplete="off"
+                       placeholder="https://… (optional)">
+            </label>
+
+            <div class="field">
+                <div class="field-header">
+                    <span class="field-label">Ingredients</span>
+                    <button type="button" class="icon-btn pick-list-btn" id="build-pick"
+                            title="Pick ingredients" aria-label="Pick ingredients">☰</button>
+                </div>
+                <ul class="build-picks dialog-picks" id="build-dialog-picks"></ul>
+            </div>
 
             <fieldset class="field">
                 <legend class="field-label">Categories</legend>
@@ -116,52 +131,12 @@
                 <textarea id="build-notes" rows="4" placeholder="How to make it, prep tips, what made it great…"></textarea>
             </label>
 
-            <div class="field">
-                <span class="field-label">In this recipe</span>
-                <p class="build-summary" id="build-summary"></p>
-            </div>
-
             <p class="form-error" id="build-error" hidden></p>
 
             <div class="dialog-actions">
                 <span class="spacer"></span>
-                <button type="button" class="secondary-btn" id="build-dialog-cancel">Back</button>
+                <button type="button" class="secondary-btn" id="build-dialog-cancel">Cancel</button>
                 <button type="submit" class="primary-btn" id="build-save">Save</button>
-            </div>
-        </form>
-    </dialog>
-
-    <dialog class="dialog" id="link-dialog">
-        <form id="link-form" novalidate>
-            <h2>Add link recipe 🔗</h2>
-
-            <label class="field">
-                <span class="field-label">Name</span>
-                <input type="text" id="link-name" maxlength="80" autocomplete="off" required>
-            </label>
-
-            <label class="field">
-                <span class="field-label">Link</span>
-                <input type="url" id="link-url" inputmode="url" autocomplete="off"
-                       placeholder="https://…" required>
-            </label>
-
-            <fieldset class="field">
-                <legend class="field-label">Categories</legend>
-                <div class="chips" id="link-categories"></div>
-            </fieldset>
-
-            <label class="field">
-                <span class="field-label">Notes</span>
-                <textarea id="link-notes" rows="4" placeholder="What we'd change, how it turned out…"></textarea>
-            </label>
-
-            <p class="form-error" id="link-error" hidden></p>
-
-            <div class="dialog-actions">
-                <span class="spacer"></span>
-                <button type="button" class="secondary-btn" id="link-cancel">Cancel</button>
-                <button type="submit" class="primary-btn" id="link-save">Save</button>
             </div>
         </form>
     </dialog>
@@ -175,6 +150,7 @@
             <button type="button" class="icon-btn" id="recipe-url-edit"
                     title="Change link" aria-label="Change link">✏️</button>
         </div>
+        <button type="button" class="text-btn recipe-url-add" id="recipe-url-add" hidden>🔗 Add link</button>
 
         <div class="field" id="recipe-ingredients-field">
             <div class="field-header">

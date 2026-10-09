@@ -329,6 +329,7 @@ body {
 }
 
 .field input[type="text"],
+.field input[type="url"],
 .filter-search input {
     width: 100%;
     padding: 10px 12px;
@@ -339,6 +340,7 @@ body {
 }
 
 .field input[type="text"]:focus,
+.field input[type="url"]:focus,
 .filter-search input:focus {
     border-color: var(--accent);
 }
@@ -490,9 +492,26 @@ body {
     border-color: var(--accent);
 }
 
-.build-summary {
+/* The new recipe dialog's picks: wrap freely, no tray-sized scroll box. */
+.dialog-picks {
     margin: 0;
-    color: var(--text);
+    max-height: none;
+}
+
+/* ☰ next to "Ingredients": goes to the ingredient list to pick. */
+.pick-list-btn {
+    width: 36px;
+    height: 36px;
+    margin-bottom: 6px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-weight: 700;
+}
+
+.pick-list-btn:hover,
+.pick-list-btn:focus-visible {
+    background: var(--accent);
+    color: #fff;
 }
 
 /* Selection mode: only picking is possible, so hide everything that edits or navigates. */
@@ -765,7 +784,7 @@ body.selecting .ingredient-row.unpickable::after {
     outline: none;
 }
 
-.recipe-card.kind-link {
+.recipe-card.has-link {
     border-top-color: #f59e0b;
 }
 
@@ -955,12 +974,15 @@ body.selecting .ingredient-row.unpickable::after {
     color: #fff;
 }
 
-/* The last ingredient can't be removed. */
-.recipe-ingredient-remove:disabled {
-    opacity: 0.4;
-    cursor: default;
-    background: var(--accent-soft);
-    color: var(--accent-ink);
+.recipe-ingredients-empty {
+    color: var(--muted);
+    font-style: italic;
+    padding: 4px 0;
+}
+
+.recipe-url-add {
+    display: block;
+    margin: 0 0 16px;
 }
 
 .text-btn {

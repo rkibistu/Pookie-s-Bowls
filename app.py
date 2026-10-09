@@ -149,7 +149,7 @@ def list_ingredients():
     by_section = {s["id"]: s for s in recipe_sections}
     recipe_favorites = _favorites_by(conn, "recipe_id")
     for r in conn.execute(
-        "SELECT l.category_id, r.id, r.name, r.kind FROM recipe_category_links l "
+        "SELECT l.category_id, r.id, r.name FROM recipe_category_links l "
         "JOIN recipes r ON r.id = l.recipe_id "
         "ORDER BY r.name COLLATE NOCASE"
     ):
@@ -158,7 +158,6 @@ def list_ingredients():
                 {
                     "id": r["id"],
                     "name": r["name"],
-                    "kind": r["kind"],
                     "favorites": recipe_favorites.get(r["id"], []),
                 }
             )
@@ -270,9 +269,6 @@ def remove_recipe_favorite(recipe_id, person):
 
 # ---- Recipes -------------------------------------------------------------
 
-KINDS = ("manual", "link")
-
-
 def _is_id(value):
     return isinstance(value, int) and not isinstance(value, bool)
 
@@ -313,11 +309,11 @@ def _parse_recipe_category_ids(payload):
 
 
 def _parse_components(payload, recipe_id=None):
-    """Validate components; return [("ingredient_id"|"recipe_id", id)] in pick order.
+    """Validate optional components; return [("ingredient_id"|"recipe_id", id)] in pick order.
 
     recipe_id is the recipe being edited, which must not end up inside itself.
     """
-    components = payload.get("components")
+    components = payload.get("components") or []
     invalid = ApiError(
         "components must be a list of {ingredient_id} or {recipe_id} objects."
     )
@@ -332,8 +328,6 @@ def _parse_components(payload, recipe_id=None):
             raise invalid
         parsed.append((key, value))
     parsed = list(dict.fromkeys(parsed))  # dedupe, keep order
-    if not parsed:
-        raise ApiError("Pick at least one ingredient.")
 
     conn = db.get_db()
     ingredient_ids = [v for k, v in parsed if k == "ingredient_id"]
@@ -380,14 +374,18 @@ def _parse_components(payload, recipe_id=None):
 
 
 def _parse_url(payload):
-    """Validate a link recipe's URL; return it as http(s)."""
+    """Validate the optional recipe link; return it as http(s), or None if blank."""
     url = payload.get("url")
-    url = url.strip() if isinstance(url, str) else ""
+    if url is not None and not isinstance(url, str):
+        raise ApiError("url must be text.")
+    url = (url or "").strip()
+    if not url:
+        return None
     if url and "://" not in url:
         url = "https://" + url  # "example.com/poke" → https://example.com/poke
     # Only http(s) is accepted, so the URL is always safe to use as an href.
     invalid = ApiError("Please enter a valid link (http/https).")
-    if not url or any(c.isspace() for c in url):
+    if any(c.isspace() for c in url):
         raise invalid
     try:
         parts = urlsplit(url)
@@ -399,16 +397,17 @@ def _parse_url(payload):
     return url
 
 
-def _parse_recipe(payload, kind, recipe_id=None):
-    """Validate a recipe body of the given kind; return its fields as a dict."""
+def _parse_recipe(payload, recipe_id=None):
+    """Validate a recipe body; return its fields as a dict.
+
+    The link and the components are both optional.
+    """
     return {
         "name": _parse_name(payload, "recipe"),
         "notes": _parse_notes(payload),
         "category_ids": _parse_recipe_category_ids(payload),
-        "url": _parse_url(payload) if kind == "link" else None,
-        "components": (
-            _parse_components(payload, recipe_id) if kind == "manual" else []
-        ),
+        "url": _parse_url(payload),
+        "components": _parse_components(payload, recipe_id),
     }
 
 
@@ -482,7 +481,7 @@ def _recipe_components(conn, recipe_id=None):
 def _get_recipe_row(conn, recipe_id):
     """Return a recipe's own row, or raise 404."""
     row = conn.execute(
-        "SELECT id, kind, name, url, notes, created_at FROM recipes WHERE id = ?",
+        "SELECT id, name, url, notes, created_at FROM recipes WHERE id = ?",
         (recipe_id,),
     ).fetchone()
     if row is None:
@@ -535,7 +534,7 @@ def list_recipes():
             "components": components.get(r["id"], []),
         }
         for r in conn.execute(
-            "SELECT id, kind, name, url, notes FROM recipes "
+            "SELECT id, name, url, notes FROM recipes "
             "ORDER BY created_at DESC, id DESC"
         )
     ]
@@ -552,16 +551,13 @@ def create_recipe():
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         raise ApiError("Expected a JSON object.")
-    kind = payload.get("kind")
-    if kind not in KINDS:
-        raise ApiError("kind must be 'manual' or 'link'.")
-    recipe = _parse_recipe(payload, kind)
+    recipe = _parse_recipe(payload)
 
     conn = db.get_db()
     with conn:
         cur = conn.execute(
-            "INSERT INTO recipes (name, kind, url, notes) VALUES (?, ?, ?, ?)",
-            (recipe["name"], kind, recipe["url"], recipe["notes"]),
+            "INSERT INTO recipes (name, url, notes) VALUES (?, ?, ?)",
+            (recipe["name"], recipe["url"], recipe["notes"]),
         )
         _save_recipe_parts(conn, cur.lastrowid, recipe)
     return jsonify(_get_recipe(conn, cur.lastrowid)), 201
@@ -569,13 +565,13 @@ def create_recipe():
 
 @app.put("/api/recipes/<int:recipe_id>")
 def update_recipe(recipe_id):
-    """Edit a recipe; its kind (manual/link) stays the same."""
+    """Replace a recipe's fields."""
     conn = db.get_db()
-    kind = _get_recipe_row(conn, recipe_id)["kind"]  # 404 if missing
+    _get_recipe_row(conn, recipe_id)  # 404 if missing
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         raise ApiError("Expected a JSON object.")
-    recipe = _parse_recipe(payload, kind, recipe_id)
+    recipe = _parse_recipe(payload, recipe_id)
     _write_recipe(conn, recipe_id, recipe)
     return jsonify(_get_recipe(conn, recipe_id))
 
@@ -599,7 +595,7 @@ def patch_recipe(recipe_id):
         ],
     }
     merged.update((k, v) for k, v in payload.items() if k in merged)
-    recipe = _parse_recipe(merged, current["kind"], recipe_id)
+    recipe = _parse_recipe(merged, recipe_id)
     _write_recipe(conn, recipe_id, recipe)
     return jsonify(_get_recipe(conn, recipe_id))
 

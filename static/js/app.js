@@ -328,11 +328,15 @@ function initIngredients() {
 
 // ---- Recipe builder -------------------------------------------------------
 
-// null outside selection mode; otherwise {picks, recipe, returnTo}:
+// null outside selection mode; otherwise {picks, recipe, returnTo, fromDialog}:
 // picks is Map<itemKey, {type, id, name}> in pick order, recipe is the
 // recipe whose ingredients are being changed (null for a new one), returnTo
-// the view to go back to.
+// the view to go back to, fromDialog whether Done goes back to the new
+// recipe dialog.
 let builder = null;
+// The new recipe being written in the build dialog: {picks}, or null. Its
+// other fields live in the dialog's form until it's saved or cancelled.
+let draft = null;
 let recipeCategories = []; // every recipe category, for the dialogs' chips
 
 async function loadRecipeCategories() {
@@ -356,23 +360,48 @@ const defaultCategoryIds = () =>
 const componentsBody = (items) =>
   [...items].map((x) => (x.type === "recipe" ? { recipe_id: x.id } : { ingredient_id: x.id }));
 
-/**
- * Enter selection mode. Without a recipe it builds a new one (then asks for a
- * name); with a manual recipe it only changes that recipe's ingredients.
- */
-function startBuilder(recipe = null, returnTo = null) {
-  builder = { picks: new Map(), recipe, returnTo };
-  for (const c of recipe ? recipe.components : []) {
-    builder.picks.set(itemKey(c), { type: c.type, id: c.id, name: c.name });
-  }
+/** A removable chip: the label and a ✕ that calls onRemove. */
+function pickChip(label, removeLabel, onRemove) {
+  const chip = el("li", "build-pick");
+  const remove = el("button", "build-pick-remove", "✕");
+  remove.type = "button";
+  remove.setAttribute("aria-label", removeLabel);
+  remove.addEventListener("click", onRemove);
+  chip.append(el("span", null, label), remove);
+  return chip;
+}
 
-  // Fill the name dialog now, so going Back and forth keeps what was typed.
+/** Start a new recipe: empty form and no picks. */
+function startDraft() {
+  draft = { picks: new Map() };
   document.getElementById("build-form").reset();
   renderChips("build-categories", categoryChipOptions(), defaultCategoryIds());
+}
+
+/**
+ * Enter selection mode. Without a recipe it picks the new recipe's
+ * ingredients (a fresh one, or the open draft when fromDialog); with a
+ * recipe it only changes that recipe's ingredients.
+ */
+function startBuilder(recipe = null, returnTo = null, fromDialog = false) {
+  let picks;
+  if (recipe) {
+    picks = new Map(
+      recipe.components.map((c) => [itemKey(c), { type: c.type, id: c.id, name: c.name }]),
+    );
+  } else if (fromDialog) {
+    picks = new Map(draft.picks); // a copy, so Cancel keeps the draft's picks
+  } else {
+    startDraft();
+    picks = draft.picks; // shared: the dialog's Back returns to these
+  }
+  builder = { picks, recipe, returnTo, fromDialog };
+
   document.getElementById("build-title").textContent = recipe
     ? `🥣 ${recipe.name}`
     : "🥣 Your recipe";
-  document.getElementById("build-create").textContent = recipe ? "Done ✓" : "Create";
+  document.getElementById("build-create").textContent =
+    recipe || fromDialog ? "Done ✓" : "Create";
 
   document.body.classList.add("selecting");
   document.getElementById("build-tray").hidden = false;
@@ -380,16 +409,24 @@ function startBuilder(recipe = null, returnTo = null) {
   renderIngredients();
 }
 
-/** Leave selection mode, dropping every pick; back to the recipe if editing one. */
-function endBuilder() {
-  const { returnTo, recipe } = builder || {};
+/**
+ * Leave selection mode, back to where it started: the recipe being edited,
+ * or the new recipe dialog (keeping the picks if keep is true).
+ */
+function endBuilder(keep = false) {
+  const { returnTo, recipe, fromDialog, picks } = builder || {};
   builder = null;
   document.body.classList.remove("selecting");
   document.getElementById("build-tray").hidden = true;
-  document.getElementById("build-form").reset();
   renderIngredients();
   if (returnTo) setView(returnTo);
   if (recipe) openRecipe(recipe.id);
+  if (fromDialog) {
+    if (keep) draft.picks = picks;
+    openBuildDialog();
+  } else if (!recipe) {
+    draft = null;
+  }
 }
 
 function togglePick(item) {
@@ -408,47 +445,77 @@ function renderTray() {
     list.append(el("li", "build-empty", "Tap ingredients to add them"));
   }
   for (const [key, pick] of builder.picks) {
-    const chip = el("li", "build-pick");
-    const remove = el("button", "build-pick-remove", "✕");
-    remove.type = "button";
-    remove.setAttribute("aria-label", `Remove ${pick.name}`);
-    remove.addEventListener("click", () => {
-      builder.picks.delete(key);
-      renderTray();
-      renderIngredients();
-    });
-    chip.append(el("span", null, pick.name), remove);
-    list.append(chip);
+    list.append(
+      pickChip(pick.name, `Remove ${pick.name}`, () => {
+        builder.picks.delete(key);
+        renderTray();
+        renderIngredients();
+      }),
+    );
   }
   document.getElementById("build-count").textContent = String(builder.picks.size);
-  document.getElementById("build-create").disabled = builder.picks.size === 0;
 }
 
+/** The draft's picks in the build dialog, each removable. */
+function renderDialogPicks() {
+  const list = document.getElementById("build-dialog-picks");
+  list.replaceChildren();
+  if (draft.picks.size === 0) {
+    list.append(el("li", "build-empty", "No ingredients yet — tap ☰ to pick some"));
+  }
+  for (const [key, pick] of draft.picks) {
+    list.append(
+      pickChip(itemLabel(pick), `Remove ${pick.name}`, () => {
+        draft.picks.delete(key);
+        renderDialogPicks();
+        if (builder) renderTray(); // same picks as the tray behind the dialog
+      }),
+    );
+  }
+}
+
+/** Show the build dialog for the draft; Back returns to picking if picking. */
 function openBuildDialog() {
-  document.getElementById("build-summary").textContent = [...builder.picks.values()]
-    .map((pick) => pick.name)
-    .join(", ");
+  renderDialogPicks();
+  document.getElementById("build-dialog-cancel").textContent = builder ? "Back" : "Cancel";
   showDialogError(null, "build-error");
   document.getElementById("build-dialog").showModal();
   document.getElementById("build-name").focus();
 }
 
+/** From the Recipes page: a new recipe, with or without link and ingredients. */
+function openNewRecipe() {
+  startDraft();
+  openBuildDialog();
+}
+
+/** The dialog's ☰: go pick ingredients, then come back to the dialog. */
+function pickFromDialog() {
+  document.getElementById("build-dialog").close();
+  if (builder) return; // already picking behind the dialog
+  const returnTo = localStorage.getItem(VIEW_KEY) || "recipes";
+  setView("ingredients");
+  startBuilder(null, returnTo, true);
+}
+
 async function saveBuilt(event) {
   event.preventDefault();
   const body = {
-    kind: "manual",
     name: document.getElementById("build-name").value,
+    url: document.getElementById("build-url").value,
     notes: document.getElementById("build-notes").value,
     category_ids: checkedChipIds("build-categories"),
-    components: componentsBody(builder.picks.values()),
+    components: componentsBody(draft.picks.values()),
   };
   const save = document.getElementById("build-save");
   save.disabled = true;
   try {
     const recipe = await api("POST", "/api/recipes", body);
     document.getElementById("build-dialog").close();
-    endBuilder();
-    await loadIngredients(); // a new or renamed sauce shows up in the list
+    if (builder) endBuilder();
+    draft = null;
+    // A new sauce shows up in the ingredient list too.
+    await Promise.all([loadRecipes(), loadIngredients()]);
     showToast(`“${recipe.name}” saved! ${recipeEmoji(recipe)}`);
   } catch (err) {
     showDialogError(err.message, "build-error");
@@ -469,6 +536,7 @@ async function savePickedComponents() {
     showToast("Saved ✓");
   } catch (err) {
     showToast(`Couldn't save: ${err.message}`);
+  } finally {
     done.disabled = false;
   }
 }
@@ -486,15 +554,19 @@ function showToast(message) {
 
 function initBuilder() {
   document.getElementById("new-recipe-btn").addEventListener("click", () => startBuilder());
-  document.getElementById("build-cancel").addEventListener("click", endBuilder);
+  document.getElementById("new-recipe-link-btn").addEventListener("click", openNewRecipe);
+  document.getElementById("build-cancel").addEventListener("click", () => endBuilder());
   document.getElementById("build-create").addEventListener("click", () => {
     if (builder.recipe) savePickedComponents();
+    else if (builder.fromDialog) endBuilder(true);
     else openBuildDialog();
   });
   document.getElementById("build-form").addEventListener("submit", saveBuilt);
-  document
-    .getElementById("build-dialog-cancel")
-    .addEventListener("click", () => document.getElementById("build-dialog").close());
+  document.getElementById("build-pick").addEventListener("click", pickFromDialog);
+  document.getElementById("build-dialog-cancel").addEventListener("click", () => {
+    document.getElementById("build-dialog").close();
+    if (!builder) draft = null; // Back keeps picking; Cancel drops the draft
+  });
   loadRecipeCategories();
 }
 
@@ -543,7 +615,7 @@ function renderRecipes() {
   renderFilterState(shown.length);
 
   if (recipes.length === 0) {
-    container.append(el("p", "placeholder", "No recipes yet — create one 🥣 or add a link 🔗"));
+    container.append(el("p", "placeholder", "No recipes yet — tap + New recipe 🥣"));
     return;
   }
   if (shown.length === 0) {
@@ -552,7 +624,7 @@ function renderRecipes() {
   }
 
   for (const recipe of shown) {
-    const card = el("button", `recipe-card kind-${recipe.kind}`);
+    const card = el("button", recipe.url ? "recipe-card has-link" : "recipe-card");
     card.type = "button";
     card.addEventListener("click", () => openRecipe(recipe.id));
 
@@ -563,9 +635,10 @@ function renderRecipes() {
     );
     card.append(header, renderCategoryBadges(recipe));
 
-    if (recipe.kind === "link") {
+    if (recipe.url) {
       card.append(el("p", "recipe-card-host", `🔗 ${hostname(recipe.url)}`));
-    } else if (recipe.components.length) {
+    }
+    if (recipe.components.length) {
       const chips = el("div", "recipe-card-chips");
       for (const c of recipe.components.slice(0, CARD_CHIPS)) {
         const name = c.type === "recipe" ? `${SUB_RECIPE} ${c.name}` : c.name;
@@ -607,16 +680,12 @@ function renderFilterState(shownCount) {
   const picks = document.getElementById("recipe-filter-picks");
   picks.replaceChildren();
   for (const [key, item] of recipeFilter.items) {
-    const chip = el("li", "build-pick");
-    const remove = el("button", "build-pick-remove", "✕");
-    remove.type = "button";
-    remove.setAttribute("aria-label", `Stop filtering by ${item.name}`);
-    remove.addEventListener("click", () => {
-      recipeFilter.items.delete(key);
-      renderRecipes();
-    });
-    chip.append(el("span", null, itemLabel(item)), remove);
-    picks.append(chip);
+    picks.append(
+      pickChip(itemLabel(item), `Stop filtering by ${item.name}`, () => {
+        recipeFilter.items.delete(key);
+        renderRecipes();
+      }),
+    );
   }
   document.getElementById("recipe-filter-count").textContent = filterActive()
     ? `${shownCount} of ${recipes.length}`
@@ -765,18 +834,21 @@ function renderRecipeDialog() {
 
   document.getElementById("recipe-title").textContent = recipe.name;
 
-  document.getElementById("recipe-url-row").hidden = recipe.kind !== "link";
+  document.getElementById("recipe-url-row").hidden = !recipe.url;
+  document.getElementById("recipe-url-add").hidden = Boolean(recipe.url);
   const link = document.getElementById("recipe-url");
-  if (recipe.kind === "link") link.href = recipe.url; // server only accepts http(s)
+  if (recipe.url) link.href = recipe.url; // server only accepts http(s)
   else link.removeAttribute("href");
 
-  document.getElementById("recipe-ingredients-field").hidden = recipe.kind !== "manual";
   document.getElementById("recipe-ingredients-edit").textContent = editingIngredients
     ? "Done"
     : "✏️ Edit";
   document.getElementById("recipe-ingredients-tools").hidden = !editingIngredients;
   const list = document.getElementById("recipe-ingredients");
   list.replaceChildren();
+  if (recipe.components.length === 0) {
+    list.append(el("li", "recipe-ingredients-empty", "No ingredients yet"));
+  }
   for (const component of recipe.components) {
     list.append(renderRecipeComponent(component));
   }
@@ -805,11 +877,9 @@ function renderRecipeComponent(component) {
   }
   if (!editingIngredients) return item;
 
-  // A recipe needs an ingredient, so the last one can't be removed.
   const remove = el("button", "recipe-ingredient-remove", "✕");
   remove.type = "button";
   remove.setAttribute("aria-label", `Remove ${component.name}`);
-  remove.disabled = shownRecipe.components.length === 1;
   remove.addEventListener("click", () => {
     const key = itemKey(component);
     saveRecipePatch({
@@ -851,10 +921,11 @@ function saveRecipePatch(fields) {
  * Swap a shown element for a text box holding value. Leaving it or Enter
  * (single line only) saves through onSave if it changed; Escape undoes.
  */
-function editInPlace(display, { value, multiline = false, onSave }) {
+function editInPlace(display, { value, multiline = false, placeholder = "", onSave }) {
   const input = document.createElement(multiline ? "textarea" : "input");
   input.className = "inline-edit";
   input.value = value;
+  input.placeholder = placeholder;
   // Same look and spot as the text it replaces, so nothing jumps.
   const style = getComputedStyle(display);
   input.style.font = style.font;
@@ -920,45 +991,7 @@ async function deleteRecipe() {
   }
 }
 
-/** Open the dialog for adding a link recipe. */
-function openLinkDialog() {
-  document.getElementById("link-form").reset();
-  renderChips("link-categories", categoryChipOptions(), defaultCategoryIds());
-  showDialogError(null, "link-error");
-  document.getElementById("link-dialog").showModal();
-  document.getElementById("link-name").focus();
-}
-
-async function saveLink(event) {
-  event.preventDefault();
-  const body = {
-    kind: "link",
-    name: document.getElementById("link-name").value,
-    url: document.getElementById("link-url").value,
-    notes: document.getElementById("link-notes").value,
-    category_ids: checkedChipIds("link-categories"),
-  };
-  const save = document.getElementById("link-save");
-  save.disabled = true;
-  try {
-    const recipe = await api("POST", "/api/recipes", body);
-    document.getElementById("link-dialog").close();
-    await Promise.all([loadRecipes(), loadIngredients()]);
-    showToast(`“${recipe.name}” saved! 🔗`);
-  } catch (err) {
-    showDialogError(err.message, "link-error");
-  } finally {
-    save.disabled = false;
-  }
-}
-
 function initRecipes() {
-  document.getElementById("add-link-btn").addEventListener("click", () => openLinkDialog());
-  document.getElementById("link-form").addEventListener("submit", saveLink);
-  document
-    .getElementById("link-cancel")
-    .addEventListener("click", () => document.getElementById("link-dialog").close());
-
   // Everything on the recipe dialog saves as soon as it changes.
   makeEditable("recipe-title", () => ({
     value: shownRecipe.name,
@@ -969,9 +1002,17 @@ function initRecipes() {
     multiline: true,
     onSave: (notes) => saveRecipePatch({ notes }),
   }));
+  // Clearing the link removes it.
   document.getElementById("recipe-url-edit").addEventListener("click", () => {
     editInPlace(document.getElementById("recipe-url-row"), {
       value: shownRecipe.url,
+      onSave: (url) => saveRecipePatch({ url }),
+    });
+  });
+  document.getElementById("recipe-url-add").addEventListener("click", () => {
+    editInPlace(document.getElementById("recipe-url-add"), {
+      value: "",
+      placeholder: "https://…",
       onSave: (url) => saveRecipePatch({ url }),
     });
   });
