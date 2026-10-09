@@ -275,12 +275,16 @@ body {
 }
 
 .ingredient-row {
+    position: relative; /* anchors the ⋯ menu */
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
     min-height: 48px;
     border-bottom: 1px solid var(--border);
+    /* Double-click/tap toggles a heart; don't select text or zoom on it. */
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .ingredient-row:last-child {
@@ -425,55 +429,99 @@ body {
     100% { transform: scale(1); }
 }
 
-/* Not yet a favorite: a faded heart in the current identity's color. */
-.fav-btn:not(.is-favorite) {
-    opacity: 0.35;
-    filter: grayscale(0.3);
-}
-
-.fav-btn:not(.is-favorite):hover,
-.fav-btn:not(.is-favorite):focus-visible {
-    opacity: 1;
-    filter: none;
-}
-
 .fav-hint {
-    display: none;
     flex: 1;
     margin: 0;
     color: var(--muted);
     font-size: 0.85rem;
 }
 
-/* Mouse/trackpad: the toggle only appears while hovering (or focusing) the row. */
-@media (hover: hover) {
-    .fav-btn {
-        visibility: hidden;
-    }
-
-    .ingredient-row:hover .fav-btn,
-    .ingredient-row:focus-within .fav-btn {
-        visibility: visible;
-    }
+/* ＋ on a row: start a recipe with it (the same ＋ as while picking). */
+.row-start {
+    color: var(--muted);
+    font-weight: 600;
 }
 
-/* Touch screens: no toggle at all; double-tap the row instead (see app.js). */
-@media (hover: none) {
-    .fav-btn {
+.row-start:hover,
+.row-start:focus-visible {
+    color: var(--accent-ink);
+}
+
+/* Mouse/trackpad: ＋ always shows, ✏️ only while hovering (or focusing) the row; no ⋯. */
+@media (hover: hover) {
+    .row-more {
         display: none;
     }
 
-    .fav-hint {
-        display: block;
+    .row-edit {
+        visibility: hidden;
+    }
+
+    /* Faded while hovering the row, full once on the ✏️ itself. */
+    .ingredient-row:hover .row-edit,
+    .ingredient-row:focus-within .row-edit {
+        visibility: visible;
+        opacity: 0.35;
+    }
+
+    .ingredient-row .row-edit:hover,
+    .ingredient-row .row-edit:focus-visible {
+        opacity: 1;
+    }
+}
+
+/* Touch screens: ⋯ opens a menu with both actions; double-tap for hearts. */
+@media (hover: none) {
+    .row-start,
+    .row-edit {
+        display: none;
     }
 
     .ingredient-row {
-        /* No double-tap zoom or text selection getting in the way. */
         touch-action: manipulation;
-        user-select: none;
-        -webkit-user-select: none;
         -webkit-tap-highlight-color: transparent;
     }
+}
+
+.row-more {
+    font-weight: 700;
+}
+
+.row-menu {
+    position: absolute;
+    top: calc(100% - 4px);
+    right: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    min-width: 170px;
+    padding: 6px;
+    background: var(--surface);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(30, 20, 40, 0.2);
+    animation: menu-in 0.12s ease-out;
+}
+
+@keyframes menu-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.row-menu-item {
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    font: inherit;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.row-menu-item:hover,
+.row-menu-item:focus-visible {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
 }
 
 /* ---- Bowl builder ----------------------------------------------------- */
@@ -498,7 +546,8 @@ body.selecting .app-nav,
 body.selecting #add-ingredient-btn,
 body.selecting #new-recipe-btn,
 body.selecting .fav-hint,
-body.selecting .ingredient-row .icon-btn {
+body.selecting .ingredient-row .icon-btn,
+body.selecting .row-menu {
     display: none;
 }
 

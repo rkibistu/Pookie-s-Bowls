@@ -15,9 +15,9 @@ function setIdentity(who) {
   document.querySelectorAll(".identity-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.who === who);
   });
-  // The favorite toggles act for the current identity, so redraw them.
+  // Double-clicking a row toggles the current identity's heart.
   document.getElementById("fav-hint").textContent =
-    `Double-tap to ${HEARTS[who]}`;
+    `${touchOnly.matches ? "Double-tap" : "Double-click"} to ${HEARTS[who]}`;
   renderIngredients();
 }
 
@@ -120,7 +120,21 @@ function renderCategoryCard(title, items) {
   return card;
 }
 
-/** One ingredient or recipe row: name + hearts, favorite toggle, edit. */
+/** A row's small round button: el("button") with a label for screen readers. */
+function rowButton(className, text, label, onClick) {
+  const btn = el("button", `icon-btn ${className}`, text);
+  btn.type = "button";
+  btn.title = label;
+  btn.setAttribute("aria-label", label);
+  btn.addEventListener("click", onClick);
+  return btn;
+}
+
+/**
+ * One ingredient or recipe row: name + hearts, then ✏️ and ＋ (start a recipe
+ * with it) with a mouse, or ⋯ (a menu with both) on touch screens. ＋ sits at
+ * the end, where picking mode shows its ＋ too.
+ */
 function renderItemRow(item) {
   const row = el("li", "ingredient-row");
   const key = itemKey(item);
@@ -129,33 +143,79 @@ function renderItemRow(item) {
   if (builder && builder.picks.has(key)) row.classList.add("picked");
   if (!pickable) row.classList.add("unpickable");
 
-  const edit = el("button", "icon-btn", "✏️");
-  edit.type = "button";
-  edit.title = `Edit ${item.name}`;
-  edit.setAttribute("aria-label", `Edit ${item.name}`);
-  edit.addEventListener("click", () => {
-    if (item.type === "recipe") openRecipe(item.id);
-    else openIngredientDialog(item);
-  });
-  row.append(renderIngredientLabel(item), renderFavoriteToggle(item), edit);
+  row.append(
+    renderIngredientLabel(item),
+    rowButton("row-edit", "✏️", `Edit ${item.name}`, () => editItem(item)),
+    rowButton("row-start", "＋", `Start a recipe with ${item.name}`, () => startRecipeWith(item)),
+    rowButton("row-more", "⋯", `More for ${item.name}`, () => toggleRowMenu(row, item)),
+  );
   row.addEventListener("click", (event) => {
+    // The row's own buttons and menu do their own thing (＋ even starts picking).
+    if (event.target.closest("button, .row-menu")) return;
     if (builder) {
       if (pickable) togglePick(item);
     } else {
       handleRowTap(event, row, item);
     }
   });
+  row.addEventListener("dblclick", (event) => {
+    if (builder || touchOnly.matches || event.target.closest("button, .row-menu")) return;
+    toggleFavorite(item, item.favorites.includes(currentIdentity()));
+  });
   return row;
 }
 
-// Touch screens have no hover, so the toggle is hidden there and a double-tap
-// on the row adds/removes the current identity's heart instead.
+function editItem(item) {
+  if (item.type === "recipe") openRecipe(item.id);
+  else openIngredientDialog(item);
+}
+
+/** Start a new recipe with this item already picked. */
+function startRecipeWith(item) {
+  startBuilder();
+  togglePick(item);
+}
+
+let openMenu = null; // the open ⋯ menu, if any
+
+function closeRowMenu() {
+  if (openMenu) openMenu.remove();
+  openMenu = null;
+}
+
+/** The ⋯ menu under a row: start a recipe with it, or edit it. */
+function toggleRowMenu(row, item) {
+  const wasOpen = openMenu && row.contains(openMenu);
+  closeRowMenu();
+  if (wasOpen) return;
+  const menu = el("div", "row-menu");
+  menu.setAttribute("role", "menu");
+  const option = (text, action) => {
+    const btn = el("button", "row-menu-item", text);
+    btn.type = "button";
+    btn.setAttribute("role", "menuitem");
+    btn.addEventListener("click", () => {
+      closeRowMenu();
+      action();
+    });
+    return btn;
+  };
+  menu.append(
+    option("＋ Start recipe", () => startRecipeWith(item)),
+    option("✏️ Edit", () => editItem(item)),
+  );
+  row.append(menu);
+  openMenu = menu;
+}
+
+// Touch screens: a double-tap on the row adds/removes the current identity's
+// heart (with a mouse it's a double-click, see renderItemRow).
 const touchOnly = window.matchMedia("(hover: none)");
 const DOUBLE_TAP_MS = 350;
 let lastTap = null; // {row, time} of the previous tap
 
 function handleRowTap(event, row, item) {
-  if (!touchOnly.matches || event.target.closest("button")) return;
+  if (!touchOnly.matches) return;
   const now = Date.now();
   if (lastTap && lastTap.row === row && now - lastTap.time < DOUBLE_TAP_MS) {
     lastTap = null;
@@ -184,21 +244,6 @@ function renderIngredientLabel(item) {
     label.append(badges);
   }
   return label;
-}
-
-/** Add/remove the current identity's heart. */
-function renderFavoriteToggle(item) {
-  const who = currentIdentity();
-  const isFavorite = item.favorites.includes(who);
-  const btn = el("button", "icon-btn fav-btn", isFavorite ? "💔" : HEARTS[who]);
-  btn.type = "button";
-  btn.classList.toggle("is-favorite", isFavorite);
-  btn.setAttribute("aria-pressed", String(isFavorite));
-  const action = isFavorite ? "Remove from favorites" : "Add to favorites";
-  btn.title = action;
-  btn.setAttribute("aria-label", `${action}: ${item.name}`);
-  btn.addEventListener("click", () => toggleFavorite(item, isFavorite));
-  return btn;
 }
 
 async function toggleFavorite(item, isFavorite) {
@@ -323,6 +368,13 @@ function initIngredients() {
   document
     .getElementById("ingredient-cancel")
     .addEventListener("click", () => document.getElementById("ingredient-dialog").close());
+  // A tap outside an open ⋯ menu (or Escape) closes it.
+  document.addEventListener("click", (event) => {
+    if (openMenu && !event.target.closest(".row-menu, .row-more")) closeRowMenu();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeRowMenu();
+  });
   loadIngredients();
 }
 
