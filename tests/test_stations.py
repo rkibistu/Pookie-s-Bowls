@@ -119,6 +119,8 @@ def test_new_sections_go_at_the_end(conn, poke, category):
 def test_a_section_name_or_listed_category_is_taken_once_per_station(conn, poke, category):
     for attempt, message in (
         (lambda: stations.add_section(conn, poke, {"name": "protein"}), "This station already has a section with that name."),
+        (lambda: stations.add_section(conn, poke, {"name": "PROTÉIN"}), "This station already has a section with that name."),
+        (lambda: stations.add_section(conn, poke, {"name": "fresh  vegetables / fruits"}), "This station already has a section with that name."),
         (lambda: stations.rename_section(conn, section_id(conn, poke, "Base"), "EXTRAS"), "This station already has a section with that name."),
         (lambda: stations.add_section(conn, poke, {"recipe_category_id": category("Sauce")}), "That category is already listed here."),
     ):
@@ -241,6 +243,7 @@ def test_a_new_station_goes_at_the_end_with_no_sections(conn):
         ({"name": "", "emoji": "🍔"}, INVALID, "Please give the station a name."),
         ({"name": "Burger"}, INVALID, "Please give the station an emoji."),
         ({"name": "POKE", "emoji": "🍔"}, DUPLICATE, "A station with that name already exists."),
+        ({"name": " PÔKE ", "emoji": "🍔"}, DUPLICATE, "A station with that name already exists."),
     ],
 )
 def test_a_new_station_is_refused_when_a_field_is_wrong(conn, fields, kind, message):
@@ -283,3 +286,12 @@ def test_the_last_station_cannot_be_deleted(conn, poke):
         "The last station can't be deleted; rename it instead.",
     )
     assert refused(lambda: stations.delete(conn, 99)) == (NOT_FOUND, "Station not found.")
+
+
+def test_a_sections_rows_go_a_to_z_ignoring_accents(conn, poke, ingredient):
+    for name in ("Tofu", "Ștevie", "Spinach"):
+        ingredient(name, "Base")
+
+    base = next(s for s in stations.get(conn, poke)["sections"] if s["name"] == "Base")
+
+    assert [i["name"] for i in base["items"]] == ["Spinach", "Ștevie", "Tofu"]

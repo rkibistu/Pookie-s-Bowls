@@ -6,6 +6,7 @@
 import { catalog } from "./catalog.js";
 import { el, renderChips, resetDeleteButton, showDialogError, showToast } from "./dom.js";
 import { initItemSearch } from "./item-search.js";
+import { nameKey } from "./items.js";
 
 let editing = null; // the ingredient being edited, or null while adding
 // While adding, where it goes: {station} (tick its sections), {section} (that
@@ -120,10 +121,10 @@ const tickedSectionIds = ({ newOnly = false } = {}) =>
     ),
   ].map((box) => Number(box.value));
 
-/** The ingredient in the catalog with this name, ignoring case, if any. */
+/** The ingredient in the catalog with the same name, if any. */
 function existingIngredient(name) {
-  const wanted = name.trim().toLowerCase();
-  return catalog.ingredients().find((i) => i.name.toLowerCase() === wanted) ?? null;
+  const wanted = nameKey(name);
+  return wanted ? (catalog.ingredients().find((i) => nameKey(i.name) === wanted) ?? null) : null;
 }
 
 /**

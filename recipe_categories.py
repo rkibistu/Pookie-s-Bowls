@@ -3,7 +3,7 @@
 Every function takes the database connection to work on and returns plain
 dicts; a broken rule raises RuleError. Nothing here knows about HTTP.
 
-A recipe category has a name, unique ignoring case, and an emoji. Their order
+A recipe category has a name, unique (names.py), and an emoji. Their order
 decides a recipe's emoji (its first category's) and the category a new recipe
 starts in (the first). Every recipe stays in at least one category, so the
 last one can't be deleted.
@@ -13,6 +13,8 @@ choice (see stations.py); that order is separate.
 """
 
 import sqlite3
+
+import names
 
 from errors import DUPLICATE, NOT_FOUND, RuleError
 
@@ -57,9 +59,9 @@ def create(conn, fields):
     try:
         with conn:
             cur = conn.execute(
-                "INSERT INTO recipe_categories (name, emoji, position) "
-                "VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM recipe_categories))",
-                (category["name"], category["emoji"]),
+                "INSERT INTO recipe_categories (name, name_key, emoji, position) VALUES "
+                "(?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM recipe_categories))",
+                (category["name"], names.key(category["name"]), category["emoji"]),
             )
     except sqlite3.IntegrityError:
         raise _duplicate_name()
@@ -72,6 +74,8 @@ def change(conn, category_id, fields):
     if not isinstance(fields, dict):
         raise RuleError("Expected a JSON object.")
     category = _parse({k: v for k, v in fields.items() if k in FIELDS})
+    if "name" in category:
+        category["name_key"] = names.key(category["name"])
     if category:
         assignments = ", ".join(f"{k} = ?" for k in category)
         try:
@@ -131,7 +135,7 @@ def delete(conn, category_id):
 
 
 def _duplicate_name():
-    """Names are unique ignoring case; the database says when one is taken."""
+    """Names are unique (names.py); the database says when one is taken."""
     return RuleError("A category with that name already exists.", DUPLICATE)
 
 

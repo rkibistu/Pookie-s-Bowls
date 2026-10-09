@@ -6,6 +6,8 @@ from pathlib import Path
 
 from flask import g
 
+import names
+
 DB_PATH = os.environ.get("DB_PATH", "/data/pookie.db")
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
@@ -75,8 +77,11 @@ def set_up(conn):
     conn.executescript(SCHEMA_PATH.read_text())
     if _empty(conn, "recipe_categories"):
         conn.executemany(
-            "INSERT INTO recipe_categories (name, emoji, position) VALUES (?, ?, ?)",
-            [(name, emoji, position) for position, (name, emoji) in enumerate(SEED_RECIPE_CATEGORIES)],
+            "INSERT INTO recipe_categories (name, name_key, emoji, position) VALUES (?, ?, ?, ?)",
+            [
+                (name, names.key(name), emoji, position)
+                for position, (name, emoji) in enumerate(SEED_RECIPE_CATEGORIES)
+            ],
         )
     if _empty(conn, "stations"):
         _seed_station(conn, SEED_STATION)
@@ -93,8 +98,13 @@ def _seed_station(conn, station):
         return row[0] if row else None
 
     station_id = conn.execute(
-        "INSERT INTO stations (name, emoji, recipe_category_id) VALUES (?, ?, ?)",
-        (station["name"], station["emoji"], category_id(station["recipe_category"])),
+        "INSERT INTO stations (name, name_key, emoji, recipe_category_id) VALUES (?, ?, ?, ?)",
+        (
+            station["name"],
+            names.key(station["name"]),
+            station["emoji"],
+            category_id(station["recipe_category"]),
+        ),
     ).lastrowid
     for position, section in enumerate(station["sections"]):
         if isinstance(section, tuple):
@@ -106,6 +116,6 @@ def _seed_station(conn, station):
                 )
         else:
             conn.execute(
-                "INSERT INTO sections (station_id, position, name) VALUES (?, ?, ?)",
-                (station_id, position, section),
+                "INSERT INTO sections (station_id, position, name, name_key) VALUES (?, ?, ?, ?)",
+                (station_id, position, section, names.key(section)),
             )

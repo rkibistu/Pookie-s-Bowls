@@ -3,10 +3,10 @@
 Every function takes the database connection to work on and returns plain
 dicts; a broken rule raises RuleError. Nothing here knows about HTTP.
 
-A station has a name (unique ignoring case), an emoji, the recipe category
+A station has a name (unique, see names.py), an emoji, the recipe category
 its new recipes start in (None: the first one), and its sections in order.
 A section is either an ingredient section of its own (a name, unique on the
-station ignoring case) or a listed recipe category, whose recipes it shows.
+station) or a listed recipe category, whose recipes it shows.
 Deleting a section never touches the ingredients in it: an ingredient in no
 section anywhere is an orphan, and that's fine (see docs/adr/0001).
 """
@@ -14,6 +14,7 @@ section anywhere is an orphan, and that's fine (see docs/adr/0001).
 import sqlite3
 
 import favorites
+import names
 from errors import DUPLICATE, NOT_FOUND, RuleError
 
 STATION_FIELDS = ("name", "emoji", "recipe_category_id")
@@ -56,7 +57,7 @@ def list_all(conn):
 
     for r in conn.execute(
         "SELECT si.section_id, i.id, i.name FROM section_ingredients si "
-        "JOIN ingredients i ON i.id = si.ingredient_id ORDER BY i.name COLLATE NOCASE"
+        "JOIN ingredients i ON i.id = si.ingredient_id ORDER BY i.name_key"
     ):
         sections[r["section_id"]]["items"].append(
             _row("ingredient", r, favorited.get(("ingredient", r["id"]), []))
@@ -107,9 +108,9 @@ def create(conn, fields):
     try:
         with conn:
             cur = conn.execute(
-                "INSERT INTO stations (name, emoji, position) "
-                "VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM stations))",
-                (name, emoji),
+                "INSERT INTO stations (name, name_key, emoji, position) "
+                "VALUES (?, ?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM stations))",
+                (name, names.key(name), emoji),
             )
     except sqlite3.IntegrityError:
         raise _duplicate_station()
@@ -138,6 +139,8 @@ def change(conn, station_id, fields):
         "recipe_category_id": lambda v: _parse_recipe_category_id(conn, v, optional=True),
     }
     station = {k: parsers[k](v) for k, v in fields.items() if k in STATION_FIELDS}
+    if "name" in station:
+        station["name_key"] = names.key(station["name"])
     if station:
         assignments = ", ".join(f"{k} = ?" for k in station)
         try:
@@ -161,20 +164,23 @@ def add_section(conn, station_id, fields):
     if not isinstance(fields, dict) or ("name" in fields) == ("recipe_category_id" in fields):
         raise RuleError("Give either a name or a recipe_category_id.")
     if "name" in fields:
-        column, value = "name", _parse_name(fields["name"], "Please give the section a name.")
+        name = _parse_name(fields["name"], "Please give the section a name.")
+        values = {"name": name, "name_key": names.key(name)}
     else:
-        column, value = "recipe_category_id", _parse_recipe_category_id(
-            conn, fields["recipe_category_id"]
-        )
+        values = {
+            "recipe_category_id": _parse_recipe_category_id(conn, fields["recipe_category_id"])
+        }
+    columns = ", ".join(values)
+    marks = ", ".join("?" * len(values))
     try:
         with conn:
             cur = conn.execute(
-                f"INSERT INTO sections (station_id, position, {column}) VALUES (?, "
-                "(SELECT COALESCE(MAX(position), -1) + 1 FROM sections WHERE station_id = ?), ?)",
-                (station_id, station_id, value),
+                f"INSERT INTO sections (station_id, position, {columns}) VALUES (?, "
+                f"(SELECT COALESCE(MAX(position), -1) + 1 FROM sections WHERE station_id = ?), {marks})",
+                (station_id, station_id, *values.values()),
             )
     except sqlite3.IntegrityError:
-        raise _duplicate(column)
+        raise _duplicate("name" if "name" in values else "recipe_category_id")
     return _section_of(conn, station_id, cur.lastrowid)
 
 
@@ -187,7 +193,10 @@ def rename_section(conn, section_id, name):
     name = _parse_name(name, "Please give the section a name.")
     try:
         with conn:
-            conn.execute("UPDATE sections SET name = ? WHERE id = ?", (name, section_id))
+            conn.execute(
+                "UPDATE sections SET name = ?, name_key = ? WHERE id = ?",
+                (name, names.key(name), section_id),
+            )
     except sqlite3.IntegrityError:
         raise _duplicate("name")
     return _section_of(conn, section["station_id"], section_id)
@@ -225,7 +234,7 @@ def _section_of(conn, station_id, section_id):
 
 
 def _duplicate_station():
-    """Station names are unique ignoring case; the database says when one is taken."""
+    """Station names are unique (names.py); the database says when one is taken."""
     return RuleError("A station with that name already exists.", DUPLICATE)
 
 

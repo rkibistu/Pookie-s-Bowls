@@ -91,6 +91,26 @@ def test_adding_a_taken_name_in_any_case_reuses_it_and_keeps_its_name(conn, ingr
     assert [i["name"] for i in ingredients.list_all(conn)] == ["Avocado"]
 
 
+@pytest.mark.parametrize(
+    "stored, typed",
+    [("Brânză", "branza"), ("șuncă", "ŞUNCĂ"), ("Spring onion", "  spring   ONION ")],
+)
+def test_adding_the_same_name_with_other_accents_or_spaces_reuses_it(conn, ingredient, stored, typed):
+    first = ingredient(stored)
+
+    added = ingredients.add(conn, {"name": typed})
+
+    assert (added["reused"], added["ingredient"]["id"]) == (True, first)
+    assert [i["name"] for i in ingredients.list_all(conn)] == [stored]
+
+
+def test_the_catalog_goes_a_to_z_ignoring_accents(conn, ingredient):
+    for name in ("Tofu", "Ștevie", "spinach", "Avocado"):
+        ingredient(name)
+
+    assert [i["name"] for i in ingredients.list_all(conn)] == ["Avocado", "spinach", "Ștevie", "Tofu"]
+
+
 def test_adding_to_another_section_keeps_the_sections_it_was_in(conn, section, ingredient):
     ingredient("Avocado", "Topping")
 

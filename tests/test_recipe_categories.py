@@ -51,10 +51,12 @@ def test_a_new_category_is_refused_when_a_field_is_wrong(conn, fields, message):
     assert names(conn) == ["Poke bowl", "Sauce", "Soup"]
 
 
-def test_a_name_is_taken_whatever_its_case(conn, category):
+def test_a_name_is_taken_whatever_its_case_accents_or_spaces(conn, category):
     for attempt in (
         lambda: recipe_categories.create(conn, {"name": "sauce", "emoji": "🧂"}),
         lambda: recipe_categories.change(conn, category("Soup"), {"name": "SAUCE"}),
+        lambda: recipe_categories.create(conn, {"name": " Sâuce ", "emoji": "🧂"}),
+        lambda: recipe_categories.change(conn, category("Soup"), {"name": "poke  BOWL"}),
     ):
         assert refused(attempt) == (DUPLICATE, "A category with that name already exists.")
     assert names(conn) == ["Poke bowl", "Sauce", "Soup"]

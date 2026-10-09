@@ -7,8 +7,12 @@ A shared recipe book for two people: an ingredient catalog, recipes built from t
 ### The catalog
 
 **Ingredient**:
-A base item in the catalog, such as salmon or rice. It is never a recipe: a sauce is a recipe, even though it is shown and picked like an ingredient. Its name is unique ignoring case. Adding an ingredient never makes a duplicate: a name already in the catalog (ignoring case) reuses that ingredient, keeping its name. Adding only ever puts it into more sections; taking it out of one is an edit.
+A base item in the catalog, such as salmon or rice. It is never a recipe: a sauce is a recipe, even though it is shown and picked like an ingredient. Its name is unique (see **Same name**). Adding an ingredient never makes a duplicate: a name already in the catalog reuses that ingredient, keeping its name. Adding only ever puts it into more sections; taking it out of one is an edit.
 _Avoid_: item (that also covers listed recipes)
+
+**Same name**:
+Two names are the same when they differ only in case, accents or extra spaces: *branza* is *Brânză*, *Spring  onion* is *Spring onion*. Ingredient, station and recipe category names are unique this way, and so are section names within a station. The name kept is the one typed first.
+_Avoid_: duplicate name, equal name
 
 **Item**:
 An ingredient or a recipe, told apart by its type. It is what gets picked, put inside a recipe, and favorited.
@@ -47,7 +51,7 @@ _Avoid_: shown category, ingredient-list category
 ### Building recipes
 
 **Recipe category**:
-A group a recipe is in (🥣 Poke bowl, 🥫 Sauce, 🍲 Soup…), with a name and an emoji. They are created, renamed, reordered and deleted from the Recipes page. Their order decides a recipe's emoji (its first category's) and which one a recipe started from the Recipes page begins in (the first). A recipe is in at least one, and can be in several. Its name is unique ignoring case.
+A group a recipe is in (🥣 Poke bowl, 🥫 Sauce, 🍲 Soup…), with a name and an emoji. They are created, renamed, reordered and deleted from the Recipes page. Their order decides a recipe's emoji (its first category's) and which one a recipe started from the Recipes page begins in (the first). A recipe is in at least one, and can be in several. Its name is unique (see **Same name**).
 _Avoid_: recipe type, kind
 
 **Listed recipe**:

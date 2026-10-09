@@ -8,25 +8,28 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS ingredients (
     id         INTEGER PRIMARY KEY,
     name       TEXT    NOT NULL,
+    name_key   TEXT    NOT NULL,  -- names.key(name)
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
--- Ingredient names are unique, ignoring case ("Salmon" == "salmon").
+-- Ingredient names are unique, ignoring case, accents and extra spaces
+-- ("Brânză" == "branza"; see names.py).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ingredients_name
-    ON ingredients (name COLLATE NOCASE);
+    ON ingredients (name_key);
 
 -- Recipe categories (poke bowl, sauce, soup… seeded on a fresh database; the
 -- people using the app add, rename, reorder and delete them).
 CREATE TABLE IF NOT EXISTS recipe_categories (
     id       INTEGER PRIMARY KEY,
     name     TEXT    NOT NULL,
+    name_key TEXT    NOT NULL,  -- names.key(name)
     emoji    TEXT    NOT NULL,
     position INTEGER NOT NULL DEFAULT 0
 );
 
--- Recipe category names are unique, ignoring case.
+-- Recipe category names are unique, ignoring case, accents and extra spaces.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_recipe_categories_name
-    ON recipe_categories (name COLLATE NOCASE);
+    ON recipe_categories (name_key);
 
 -- Stations: pages set up for picking one kind of recipe (🥣 Poke, 🍔 Burger…).
 -- Recipes started on a station begin in its recipe category; NULL (or a
@@ -34,14 +37,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_recipe_categories_name
 CREATE TABLE IF NOT EXISTS stations (
     id                 INTEGER PRIMARY KEY,
     name               TEXT    NOT NULL,
+    name_key           TEXT    NOT NULL,  -- names.key(name)
     emoji              TEXT    NOT NULL,
     position           INTEGER NOT NULL DEFAULT 0,
     recipe_category_id INTEGER REFERENCES recipe_categories(id) ON DELETE SET NULL
 );
 
--- Station names are unique, ignoring case.
+-- Station names are unique, ignoring case, accents and extra spaces.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_stations_name
-    ON stations (name COLLATE NOCASE);
+    ON stations (name_key);
 
 -- A station's sections, in order. Each is EITHER an ingredient section of
 -- its own (a name; ingredients go in it) OR a listed recipe category (its
@@ -51,14 +55,17 @@ CREATE TABLE IF NOT EXISTS sections (
     station_id         INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
     position           INTEGER NOT NULL DEFAULT 0,
     name               TEXT,
+    name_key           TEXT,  -- names.key(name); NULL for a listed category
     recipe_category_id INTEGER REFERENCES recipe_categories(id) ON DELETE CASCADE,
     CHECK ((name IS NOT NULL) + (recipe_category_id IS NOT NULL) = 1),
+    CHECK ((name IS NULL) = (name_key IS NULL)),
     UNIQUE (station_id, recipe_category_id)
 );
 
--- Ingredient section names are unique per station, ignoring case.
+-- Ingredient section names are unique per station, ignoring case, accents
+-- and extra spaces.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sections_name
-    ON sections (station_id, name COLLATE NOCASE);
+    ON sections (station_id, name_key);
 
 -- Which ingredient sections an ingredient is in: any number, on any
 -- stations, or none (an orphan).

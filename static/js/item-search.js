@@ -4,7 +4,7 @@
 
 import { el } from "./dom.js";
 import { catalog } from "./catalog.js";
-import { itemKey, itemLabel } from "./items.js";
+import { itemKey, itemLabel, nameKey } from "./items.js";
 
 const FILTER_SUGGESTIONS = 6;
 
@@ -28,12 +28,12 @@ export function initItemSearch(
 
   /** Show items matching what's typed; returns the matches. */
   function render() {
-    const query = input.value.trim().toLowerCase();
+    const query = nameKey(input.value); // "branza" finds Brânză
     list.replaceChildren();
     const matches = query
       ? items()
           .filter((item) => !excluded(itemKey(item)))
-          .filter((item) => item.name.toLowerCase().includes(query))
+          .filter((item) => nameKey(item.name).includes(query))
           .slice(0, FILTER_SUGGESTIONS)
       : [];
     for (const item of matches) {

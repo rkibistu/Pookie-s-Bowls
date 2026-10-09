@@ -7,6 +7,21 @@ import { el } from "./dom.js";
 // Each person's favorite heart.
 export const HEARTS = { me: "💜", her: "💚" };
 
+/**
+ * The same name (see CONTEXT.md): names differing only in case, accents or
+ * extra spaces have the same key, "branza" and "Brânză". Same rule as the
+ * server's names.py.
+ */
+export const nameKey = (name) =>
+  name
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/ß/g, "ss")
+    .trim()
+    .split(/\s+/)
+    .join(" ");
+
 /** "ingredient:3" or "recipe:7": tells items apart across both kinds. */
 export const itemKey = (item) => `${item.type}:${item.id}`;
 

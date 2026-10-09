@@ -4,13 +4,14 @@ Every function takes the database connection to work on and returns plain
 dicts; a broken rule raises RuleError. Nothing here knows about HTTP.
 
 An ingredient is a base item (sauces are recipes) with a name, unique
-ignoring case. Where it shows up is its section ids: ingredient sections on
+ignoring case, accents and extra spaces (names.py). Where it shows up is its section ids: ingredient sections on
 any stations, or none (an orphan).
 """
 
 import sqlite3
 
 import favorites
+import names
 from errors import DUPLICATE, NOT_FOUND, RuleError
 
 FIELDS = ("name", "add_section_ids", "remove_section_ids")
@@ -30,7 +31,7 @@ def list_all(conn):
             "section_ids": links.get(r["id"], []),
             "favorites": favorited.get(("ingredient", r["id"]), []),
         }
-        for r in conn.execute("SELECT id, name FROM ingredients ORDER BY name COLLATE NOCASE")
+        for r in conn.execute("SELECT id, name FROM ingredients ORDER BY name_key")
     ]
 
 
@@ -67,7 +68,7 @@ def _section_ids(conn, ingredient_id=None):
 def add(conn, fields):
     """Add an ingredient to the sections given; never makes a duplicate.
 
-    A name already in the catalog (ignoring case) reuses that ingredient and
+    The same name already in the catalog (names.py) reuses that ingredient and
     keeps its name; adding only ever puts it into more sections. section_ids
     may be left out (a new one is an orphan). Returns {ingredient, reused,
     added_to}: added_to is the section ids it wasn't in before.
@@ -80,12 +81,13 @@ def add(conn, fields):
     with conn:
         # The unique index decides "same name", so the lookup can't disagree
         # with it, and two adds at once can't both insert.
+        name_key = names.key(ingredient["name"])
         reused = conn.execute(
-            "INSERT INTO ingredients (name) VALUES (?) ON CONFLICT DO NOTHING",
-            (ingredient["name"],),
+            "INSERT INTO ingredients (name, name_key) VALUES (?, ?) ON CONFLICT DO NOTHING",
+            (ingredient["name"], name_key),
         ).rowcount == 0
         ingredient_id = conn.execute(
-            "SELECT id FROM ingredients WHERE name = ? COLLATE NOCASE", (ingredient["name"],)
+            "SELECT id FROM ingredients WHERE name_key = ?", (name_key,)
         ).fetchone()[0]
         already = set(_section_ids(conn, ingredient_id).get(ingredient_id, []))
         added_to = [s for s in ingredient["section_ids"] if s not in already]
@@ -114,8 +116,8 @@ def change(conn, ingredient_id, fields):
         with conn:
             if "name" in ingredient:
                 conn.execute(
-                    "UPDATE ingredients SET name = ? WHERE id = ?",
-                    (ingredient["name"], ingredient_id),
+                    "UPDATE ingredients SET name = ?, name_key = ? WHERE id = ?",
+                    (ingredient["name"], names.key(ingredient["name"]), ingredient_id),
                 )
             conn.executemany(
                 "INSERT OR IGNORE INTO section_ingredients (section_id, ingredient_id) "
@@ -140,7 +142,7 @@ def delete(conn, ingredient_id):
 
 
 def _duplicate_name():
-    """Names are unique ignoring case; the database says when one is taken."""
+    """Names are unique (names.py); the database says when one is taken."""
     return RuleError("An ingredient with that name already exists.", DUPLICATE)
 
 
