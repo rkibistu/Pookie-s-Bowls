@@ -1,5 +1,5 @@
 // Pookie's Bowls — app shell (identity, theme, views), ingredient catalog,
-// the recipe builder, and the recipes page.
+// picking (the pick session), new recipes, and the recipes page.
 // State that must survive reloads lives in localStorage (per device).
 
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
@@ -137,11 +137,9 @@ function rowButton(className, text, label, onClick) {
  */
 function renderItemRow(item) {
   const row = el("li", "ingredient-row");
-  const key = itemKey(item);
-  // A recipe being edited can't be picked into itself.
-  const pickable = !(builder && builder.recipe && key === `recipe:${builder.recipe.id}`);
-  if (builder && builder.picks.has(key)) row.classList.add("picked");
-  if (!pickable) row.classList.add("unpickable");
+  const pickState = pickSession.state(item);
+  if (pickState === "picked") row.classList.add("picked");
+  if (pickState === "blocked") row.classList.add("unpickable");
 
   row.append(
     renderIngredientLabel(item),
@@ -152,14 +150,11 @@ function renderItemRow(item) {
   row.addEventListener("click", (event) => {
     // The row's own buttons and menu do their own thing (＋ even starts picking).
     if (event.target.closest("button, .row-menu")) return;
-    if (builder) {
-      if (pickable) togglePick(item);
-    } else {
-      handleRowTap(event, row, item);
-    }
+    if (pickSession.active()) pickSession.toggle(item);
+    else handleRowTap(event, row, item);
   });
   row.addEventListener("dblclick", (event) => {
-    if (builder || touchOnly.matches || event.target.closest("button, .row-menu")) return;
+    if (pickSession.active() || touchOnly.matches || event.target.closest("button, .row-menu")) return;
     toggleFavorite(item, item.favorites.includes(currentIdentity()));
   });
   return row;
@@ -172,8 +167,7 @@ function editItem(item) {
 
 /** Start a new recipe with this item already picked. */
 function startRecipeWith(item) {
-  startBuilder();
-  togglePick(item);
+  pickNewRecipe([item]);
 }
 
 let openMenu = null; // the open ⋯ menu, if any
@@ -378,16 +372,134 @@ function initIngredients() {
   loadIngredients();
 }
 
-// ---- Recipe builder -------------------------------------------------------
+// ---- Pick session ---------------------------------------------------------
 
-// null outside selection mode; otherwise {picks, recipe, returnTo, fromDialog}:
-// picks is Map<itemKey, {type, id, name}> in pick order, recipe is the
-// recipe whose ingredients are being changed (null for a new one), returnTo
-// the view to go back to, fromDialog whether Done goes back to the new
-// recipe dialog.
-let builder = null;
-// The new recipe being written in the build dialog: {picks}, or null. Its
-// other fields live in the dialog's form until it's saved or cancelled.
+/**
+ * Picking ingredients and listed recipes on the Ingredients page, with the
+ * tray showing the picks. Callers say what the picks start as and what Done
+ * does with them; the session handles the view, the tray and the list.
+ */
+const pickSession = (() => {
+  // null when not picking; otherwise {picks, blocked, onDone, onCancel,
+  // returnTo}: picks is Map<itemKey, {type, id, name}> in pick order, blocked
+  // the item keys that can't be picked, returnTo the view to go back to.
+  let session = null;
+
+  /**
+   * Start picking from a copy of picks ([{type, id, name}]). Done hands the
+   * picks to onDone; if that returns a promise that rejects, picking goes on.
+   */
+  function start({
+    picks = [],
+    blocked = [],
+    title = "🥣 Your recipe",
+    doneLabel,
+    onDone,
+    onCancel = null,
+  }) {
+    session = {
+      picks: new Map([...picks].map((p) => [itemKey(p), { type: p.type, id: p.id, name: p.name }])),
+      blocked: new Set(blocked),
+      onDone,
+      onCancel,
+      returnTo: localStorage.getItem(VIEW_KEY) || "ingredients",
+    };
+    document.getElementById("build-title").textContent = title;
+    document.getElementById("build-create").textContent = doneLabel;
+    document.body.classList.add("selecting");
+    document.getElementById("build-tray").hidden = false;
+    setView("ingredients");
+    changed();
+  }
+
+  const active = () => session !== null;
+
+  /** "picked", "free" or "blocked" (e.g. a recipe can't go inside itself). */
+  function state(item) {
+    const key = itemKey(item);
+    if (!session) return "free";
+    if (session.blocked.has(key)) return "blocked";
+    return session.picks.has(key) ? "picked" : "free";
+  }
+
+  function toggle(item) {
+    const key = itemKey(item);
+    if (state(item) === "blocked") return;
+    if (session.picks.has(key)) session.picks.delete(key);
+    else session.picks.set(key, { type: item.type, id: item.id, name: item.name });
+    changed();
+  }
+
+  function changed() {
+    renderTray();
+    renderIngredients();
+  }
+
+  /** The floating tray: one chip per pick, each removable. */
+  function renderTray() {
+    const list = document.getElementById("build-picks");
+    list.replaceChildren();
+    if (session.picks.size === 0) {
+      list.append(el("li", "build-empty", "Tap ingredients to add them"));
+    }
+    for (const [key, pick] of session.picks) {
+      list.append(
+        pickChip(pick.name, `Remove ${pick.name}`, () => {
+          session.picks.delete(key);
+          changed();
+        }),
+      );
+    }
+    document.getElementById("build-count").textContent = String(session.picks.size);
+  }
+
+  /** Leave picking mode, back to the view it started from. */
+  function end() {
+    const { returnTo } = session;
+    session = null;
+    document.body.classList.remove("selecting");
+    document.getElementById("build-tray").hidden = true;
+    renderIngredients();
+    setView(returnTo);
+  }
+
+  /** While Done is saving, neither Done nor Cancel can be pressed again. */
+  function setSaving(saving) {
+    document.getElementById("build-create").disabled = saving;
+    document.getElementById("build-cancel").disabled = saving;
+  }
+
+  async function done() {
+    setSaving(true);
+    try {
+      await session.onDone([...session.picks.values()]);
+    } catch {
+      return; // onDone has said what went wrong; keep picking
+    } finally {
+      setSaving(false);
+    }
+    end();
+  }
+
+  function cancel() {
+    const { onCancel } = session;
+    end();
+    if (onCancel) onCancel();
+  }
+
+  function init() {
+    document.getElementById("build-create").addEventListener("click", done);
+    document.getElementById("build-cancel").addEventListener("click", cancel);
+  }
+
+  return { start, active, state, toggle, init };
+})();
+
+// ---- New recipe -----------------------------------------------------------
+
+// The new recipe being written in the build dialog: {picks}, or null. picks
+// is Map<itemKey, {type, id, name}> in pick order; its other fields live in
+// the dialog's form until it's saved or cancelled.
 let draft = null;
 let recipeCategories = []; // every recipe category, for the dialogs' chips
 
@@ -412,6 +524,9 @@ const defaultCategoryIds = () =>
 const componentsBody = (items) =>
   [...items].map((x) => (x.type === "recipe" ? { recipe_id: x.id } : { ingredient_id: x.id }));
 
+/** Picks as a Map<itemKey, pick>, the way the draft keeps them. */
+const picksByKey = (picks) => new Map(picks.map((p) => [itemKey(p), p]));
+
 /** A removable chip: the label and a ✕ that calls onRemove. */
 function pickChip(label, removeLabel, onRemove) {
   const chip = el("li", "build-pick");
@@ -423,90 +538,24 @@ function pickChip(label, removeLabel, onRemove) {
   return chip;
 }
 
-/** Start a new recipe: empty form and no picks. */
-function startDraft() {
-  draft = { picks: new Map() };
+/** Start a new recipe: empty form, with these picks. */
+function startDraft(picks = []) {
+  draft = { picks: picksByKey(picks) };
   document.getElementById("build-form").reset();
   document.getElementById("build-add-suggestions").hidden = true;
   renderChips("build-categories", categoryChipOptions(), defaultCategoryIds());
 }
 
-/**
- * Enter selection mode. Without a recipe it picks the new recipe's
- * ingredients (a fresh one, or the open draft when fromDialog); with a
- * recipe it only changes that recipe's ingredients.
- */
-function startBuilder(recipe = null, returnTo = null, fromDialog = false) {
-  let picks;
-  if (recipe) {
-    picks = new Map(
-      recipe.components.map((c) => [itemKey(c), { type: c.type, id: c.id, name: c.name }]),
-    );
-  } else if (fromDialog) {
-    picks = new Map(draft.picks); // a copy, so Cancel keeps the draft's picks
-  } else {
-    startDraft();
-    picks = draft.picks; // shared: the dialog's Back returns to these
-  }
-  builder = { picks, recipe, returnTo, fromDialog };
-
-  document.getElementById("build-title").textContent = recipe
-    ? `🥣 ${recipe.name}`
-    : "🥣 Your recipe";
-  document.getElementById("build-create").textContent =
-    recipe || fromDialog ? "Done ✓" : "Create";
-
-  document.body.classList.add("selecting");
-  document.getElementById("build-tray").hidden = false;
-  renderTray();
-  renderIngredients();
-}
-
-/**
- * Leave selection mode, back to where it started: the recipe being edited,
- * or the new recipe dialog (keeping the picks if keep is true).
- */
-function endBuilder(keep = false) {
-  const { returnTo, recipe, fromDialog, picks } = builder || {};
-  builder = null;
-  document.body.classList.remove("selecting");
-  document.getElementById("build-tray").hidden = true;
-  renderIngredients();
-  if (returnTo) setView(returnTo);
-  if (recipe) openRecipe(recipe.id);
-  if (fromDialog) {
-    if (keep) draft.picks = picks;
-    openBuildDialog();
-  } else if (!recipe) {
-    draft = null;
-  }
-}
-
-function togglePick(item) {
-  const key = itemKey(item);
-  if (builder.picks.has(key)) builder.picks.delete(key);
-  else builder.picks.set(key, { type: item.type, id: item.id, name: item.name });
-  renderTray();
-  renderIngredients();
-}
-
-/** The floating tray: one chip per pick, each removable. */
-function renderTray() {
-  const list = document.getElementById("build-picks");
-  list.replaceChildren();
-  if (builder.picks.size === 0) {
-    list.append(el("li", "build-empty", "Tap ingredients to add them"));
-  }
-  for (const [key, pick] of builder.picks) {
-    list.append(
-      pickChip(pick.name, `Remove ${pick.name}`, () => {
-        builder.picks.delete(key);
-        renderTray();
-        renderIngredients();
-      }),
-    );
-  }
-  document.getElementById("build-count").textContent = String(builder.picks.size);
+/** From the Ingredients page: pick first, then Create opens the dialog with the picks. */
+function pickNewRecipe(picks = []) {
+  pickSession.start({
+    picks,
+    doneLabel: "Create",
+    onDone: (picked) => {
+      startDraft(picked);
+      openBuildDialog();
+    },
+  });
 }
 
 /**
@@ -524,26 +573,16 @@ function renderDialogPicks() {
       renderComponentRow(pick, {
         onRemove: () => {
           draft.picks.delete(key);
-          draftPicksChanged();
+          renderDialogPicks();
         },
       }),
     );
   }
 }
 
-/** Redraw what shows the draft's picks, including the tray behind the dialog. */
-function draftPicksChanged() {
-  renderDialogPicks();
-  if (builder) {
-    renderTray();
-    renderIngredients();
-  }
-}
-
-/** Show the build dialog for the draft; Back returns to picking if picking. */
+/** Show the build dialog for the draft. */
 function openBuildDialog() {
   renderDialogPicks();
-  document.getElementById("build-dialog-cancel").textContent = builder ? "Back" : "Cancel";
   showDialogError(null, "build-error");
   document.getElementById("build-dialog").showModal();
   document.getElementById("build-name").focus();
@@ -555,13 +594,18 @@ function openNewRecipe() {
   openBuildDialog();
 }
 
-/** The dialog's ☰: go pick ingredients, then come back to the dialog. */
+/** The dialog's "Pick from list": pick the draft's ingredients, then come back. */
 function pickFromDialog() {
   document.getElementById("build-dialog").close();
-  if (builder) return; // already picking behind the dialog
-  const returnTo = localStorage.getItem(VIEW_KEY) || "recipes";
-  setView("ingredients");
-  startBuilder(null, returnTo, true);
+  pickSession.start({
+    picks: [...draft.picks.values()],
+    doneLabel: "Done ✓",
+    onDone: (picked) => {
+      draft.picks = picksByKey(picked);
+      openBuildDialog();
+    },
+    onCancel: openBuildDialog,
+  });
 }
 
 async function saveBuilt(event) {
@@ -578,7 +622,6 @@ async function saveBuilt(event) {
   try {
     const recipe = await api("POST", "/api/recipes", body);
     document.getElementById("build-dialog").close();
-    if (builder) endBuilder();
     draft = null;
     // A new sauce shows up in the ingredient list too.
     await Promise.all([loadRecipes(), loadIngredients()]);
@@ -587,23 +630,6 @@ async function saveBuilt(event) {
     showDialogError(err.message, "build-error");
   } finally {
     save.disabled = false;
-  }
-}
-
-/** Done while changing a recipe's ingredients: save them and go back to it. */
-async function savePickedComponents() {
-  const done = document.getElementById("build-create");
-  done.disabled = true;
-  try {
-    await api("PATCH", `/api/recipes/${builder.recipe.id}`, {
-      components: componentsBody(builder.picks.values()),
-    });
-    endBuilder();
-    showToast("Saved ✓");
-  } catch (err) {
-    showToast(`Couldn't save: ${err.message}`);
-  } finally {
-    done.disabled = false;
   }
 }
 
@@ -618,15 +644,10 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("show"), 2500);
 }
 
-function initBuilder() {
-  document.getElementById("new-recipe-btn").addEventListener("click", () => startBuilder());
+function initNewRecipe() {
+  pickSession.init();
+  document.getElementById("new-recipe-btn").addEventListener("click", () => pickNewRecipe());
   document.getElementById("new-recipe-link-btn").addEventListener("click", openNewRecipe);
-  document.getElementById("build-cancel").addEventListener("click", () => endBuilder());
-  document.getElementById("build-create").addEventListener("click", () => {
-    if (builder.recipe) savePickedComponents();
-    else if (builder.fromDialog) endBuilder(true);
-    else openBuildDialog();
-  });
   document.getElementById("build-form").addEventListener("submit", saveBuilt);
   document.getElementById("build-pick").addEventListener("click", pickFromDialog);
   initItemSearch(
@@ -635,12 +656,12 @@ function initBuilder() {
     (key) => draft.picks.has(key),
     (item) => {
       draft.picks.set(itemKey(item), item);
-      draftPicksChanged();
+      renderDialogPicks();
     },
   );
   document.getElementById("build-dialog-cancel").addEventListener("click", () => {
     document.getElementById("build-dialog").close();
-    if (!builder) draft = null; // Back keeps picking; Cancel drops the draft
+    draft = null;
   });
   loadRecipeCategories();
 }
@@ -1121,10 +1142,25 @@ function initRecipes() {
   );
   document.getElementById("recipe-pick").addEventListener("click", () => {
     const recipe = shownRecipe;
-    const returnTo = localStorage.getItem(VIEW_KEY) || "recipes";
     document.getElementById("recipe-dialog").close();
-    setView("ingredients");
-    startBuilder(recipe, returnTo);
+    // Done saves the picks as the recipe's ingredients, then shows it again.
+    pickSession.start({
+      picks: recipe.components,
+      blocked: [`recipe:${recipe.id}`],
+      title: `🥣 ${recipe.name}`,
+      doneLabel: "Done ✓",
+      onDone: async (picked) => {
+        try {
+          await api("PATCH", `/api/recipes/${recipe.id}`, { components: componentsBody(picked) });
+        } catch (err) {
+          showToast(`Couldn't save: ${err.message}`);
+          throw err;
+        }
+        showToast("Saved ✓");
+        openRecipe(recipe.id);
+      },
+      onCancel: () => openRecipe(recipe.id),
+    });
   });
 
   document.getElementById("recipe-delete").addEventListener("click", deleteRecipe);
@@ -1153,7 +1189,7 @@ function init() {
   });
 
   initIngredients();
-  initBuilder();
+  initNewRecipe();
   initRecipes();
   initRecipeFilter();
 }
