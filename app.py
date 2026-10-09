@@ -110,6 +110,14 @@ def reorder_recipe_categories():
     return jsonify(categories=recipe_categories.reorder(db.get_db(), category_ids))
 
 
+@app.put("/api/recipe-categories/listed")
+def set_listed_recipe_categories():
+    """Body: {category_ids: [the categories the Ingredients page lists, in order]}."""
+    body = request.get_json(silent=True)
+    category_ids = body.get("category_ids") if isinstance(body, dict) else None
+    return jsonify(category_ids=recipe_categories.set_listed(db.get_db(), category_ids))
+
+
 @app.delete("/api/recipe-categories/<int:category_id>")
 def delete_recipe_category(category_id):
     recipe_categories.delete(db.get_db(), category_id)

@@ -30,15 +30,16 @@ CREATE TABLE IF NOT EXISTS ingredient_categories (
 );
 
 -- Recipe categories (poke bowl, sauce, soup… seeded on a fresh database; the
--- people using the app add, rename, reorder and delete them). Recipes in a
--- category with in_ingredient_list = 1 (e.g. sauces) are shown in the
--- ingredient list and can be picked into other recipes.
+-- people using the app add, rename, reorder and delete them). A listed
+-- category (e.g. sauces) has a listed_position: its recipes are shown on the
+-- Ingredients page, in that order, and can be picked into other recipes.
+-- NULL means not listed. position is the recipe category order, separate.
 CREATE TABLE IF NOT EXISTS recipe_categories (
-    id                 INTEGER PRIMARY KEY,
-    name               TEXT    NOT NULL,
-    emoji              TEXT    NOT NULL,
-    position           INTEGER NOT NULL DEFAULT 0,
-    in_ingredient_list INTEGER NOT NULL DEFAULT 0 CHECK (in_ingredient_list IN (0, 1))
+    id              INTEGER PRIMARY KEY,
+    name            TEXT    NOT NULL,
+    emoji           TEXT    NOT NULL,
+    position        INTEGER NOT NULL DEFAULT 0,
+    listed_position INTEGER
 );
 
 -- Recipe category names are unique, ignoring case.

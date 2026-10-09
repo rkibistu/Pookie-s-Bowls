@@ -7,6 +7,7 @@ import { initNewRecipe } from "./new-recipe.js";
 import { pickSession } from "./pick-session.js";
 import { initRecipeDialog } from "./recipe-dialog.js";
 import { initRecipes } from "./recipes.js";
+import { initSectionsDialog } from "./sections-dialog.js";
 import { initShell } from "./shell.js";
 
 function init() {
@@ -17,6 +18,7 @@ function init() {
   initRecipes();
   initRecipeDialog();
   initCategoriesDialog();
+  initSectionsDialog();
   catalog.reload();
 }
 

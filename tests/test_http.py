@@ -87,5 +87,11 @@ def test_a_recipe_category_can_be_created_changed_reordered_and_deleted_over_htt
         {"error": "A category with that name already exists."},
     )
 
+    listed = client.put("/api/recipe-categories/listed", json={"category_ids": [pizza]})
+    assert (listed.status_code, listed.json) == (200, {"category_ids": [pizza]})
+    sections = client.get("/api/ingredients").json["recipe_sections"]
+    assert [s["name"] for s in sections] == ["Pizza"]
+    assert client.put("/api/recipe-categories/listed", json={"category_ids": [pizza, pizza]}).status_code == 400
+
     assert client.delete(f"/api/recipe-categories/{pizza}").status_code == 204
     assert client.delete(f"/api/recipe-categories/{pizza}").status_code == 404

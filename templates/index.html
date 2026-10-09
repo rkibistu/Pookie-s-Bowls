@@ -31,6 +31,7 @@
         <section class="view" id="view-ingredients">
             <div class="toolbar">
                 <p class="fav-hint" id="fav-hint"></p>
+                <button type="button" class="secondary-btn" id="sections-btn">✏️ Sections</button>
                 <button type="button" class="secondary-btn" id="new-recipe-btn">🥣 New recipe</button>
                 <button type="button" class="primary-btn" id="add-ingredient-btn">+ Add ingredient</button>
             </div>
@@ -203,6 +204,19 @@
         <div class="dialog-actions">
             <span class="spacer"></span>
             <button type="button" class="secondary-btn" id="categories-close">Close</button>
+        </div>
+    </dialog>
+
+    <dialog class="dialog" id="sections-dialog">
+        <h2>✏️ Sections</h2>
+        <p class="dialog-hint">Ticked recipe categories show here after the ingredients, and their recipes can be picked into others.</p>
+        <ul class="category-rows" id="section-rows"></ul>
+
+        <p class="form-error" id="sections-error" hidden></p>
+
+        <div class="dialog-actions">
+            <span class="spacer"></span>
+            <button type="button" class="secondary-btn" id="sections-close">Close</button>
         </div>
     </dialog>
 

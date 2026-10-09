@@ -52,13 +52,13 @@ def list_all(conn):
 
 
 def listed_sections(conn):
-    """The listed recipe categories (e.g. sauces) in display order, each with
+    """The listed recipe categories (e.g. sauces) in their listed order, each with
     its recipes A→Z: the recipe cards on the Ingredients page."""
     sections = [
         {**dict(r), "recipes": []}
         for r in conn.execute(
             "SELECT id, name, emoji FROM recipe_categories "
-            "WHERE in_ingredient_list = 1 ORDER BY position, id"
+            "WHERE listed_position IS NOT NULL ORDER BY listed_position, id"
         )
     ]
     by_id = {s["id"]: s for s in sections}

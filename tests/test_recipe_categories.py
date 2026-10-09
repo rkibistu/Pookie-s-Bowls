@@ -32,8 +32,8 @@ def test_a_new_category_goes_at_the_end_unlisted(conn):
         "id": created["id"],
         "name": "Pizza",
         "emoji": "🍕",
-        "in_ingredient_list": False,
     }
+    assert [s["name"] for s in recipes.listed_sections(conn)] == ["Sauce"]
     assert names(conn) == ["Poke bowl", "Sauce", "Soup", "Pizza"]
 
 
@@ -182,3 +182,71 @@ def test_a_deleted_seed_category_stays_deleted_after_a_restart(conn, category):
     db.set_up(conn)
 
     assert names(conn) == ["Poke bowl", "Sauce"]
+
+
+def listed(conn):
+    return [s["name"] for s in recipes.listed_sections(conn)]
+
+
+def test_the_ingredients_page_lists_the_categories_given_in_that_order(conn, category):
+    recipes.create(conn, {"name": "Miso soup", "category_ids": [category("Soup")]})
+
+    recipe_categories.set_listed(conn, [category("Soup"), category("Sauce")])
+
+    assert [(s["name"], [r["name"] for r in s["recipes"]]) for s in recipes.listed_sections(conn)] == [
+        ("Soup", ["Miso soup"]),
+        ("Sauce", []),
+    ]
+
+
+def test_a_category_left_out_stops_being_listed(conn, category):
+    recipe_categories.set_listed(conn, [category("Soup"), category("Sauce")])
+
+    recipe_categories.set_listed(conn, [category("Sauce")])
+
+    assert listed(conn) == ["Sauce"]
+
+
+def test_the_listed_order_is_separate_from_the_recipe_category_order(conn, category):
+    recipe_categories.set_listed(conn, [category("Soup"), category("Sauce")])
+
+    recipe_categories.reorder(conn, [category("Sauce"), category("Soup"), category("Poke bowl")])
+
+    assert listed(conn) == ["Soup", "Sauce"]
+    assert names(conn) == ["Sauce", "Soup", "Poke bowl"]
+
+
+@pytest.mark.parametrize(
+    "order",
+    [
+        lambda sauce, soup: "not a list",
+        lambda sauce, soup: [str(sauce)],
+        lambda sauce, soup: [sauce, sauce],
+        lambda sauce, soup: [soup, 999],
+    ],
+)
+def test_the_listed_categories_must_be_known_and_each_listed_once(conn, category, order):
+    order = order(category("Sauce"), category("Soup"))
+
+    assert refused(lambda: recipe_categories.set_listed(conn, order)) == (
+        INVALID,
+        "category_ids must list known categories, each once.",
+    )
+    assert listed(conn) == ["Sauce"]
+
+
+def test_unlisting_a_category_keeps_its_recipes_inside_other_recipes(conn, category):
+    mayo = recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("Sauce")]})
+    bowl = recipes.create(
+        conn,
+        {
+            "name": "Salmon bowl",
+            "category_ids": [category("Poke bowl")],
+            "components": [{"type": "recipe", "id": mayo["id"]}],
+        },
+    )
+
+    recipe_categories.set_listed(conn, [])
+
+    assert listed(conn) == []
+    assert [c["name"] for c in recipes.get(conn, bowl["id"])["components"]] == ["Spicy mayo"]

@@ -21,12 +21,12 @@ SEED_CATEGORIES = [
 ]
 
 # The recipe categories a fresh database starts with, in order: (name, emoji,
-# in_ingredient_list). Recipes in a listed category show up in the
-# ingredient list and can be picked into other recipes.
+# listed_position). Recipes in a listed category show up on the Ingredients
+# page and can be picked into other recipes; None means not listed.
 SEED_RECIPE_CATEGORIES = [
-    ("Poke bowl", "🥣", 0),
-    ("Sauce", "🥫", 1),
-    ("Soup", "🍲", 0),
+    ("Poke bowl", "🥣", None),
+    ("Sauce", "🥫", 0),
+    ("Soup", "🍲", None),
 ]
 
 
@@ -75,7 +75,7 @@ def set_up(conn):
     if conn.execute("SELECT COUNT(*) FROM recipe_categories").fetchone()[0] == 0:
         for position, (name, emoji, listed) in enumerate(SEED_RECIPE_CATEGORIES):
             conn.execute(
-                "INSERT INTO recipe_categories (name, emoji, position, in_ingredient_list) "
+                "INSERT INTO recipe_categories (name, emoji, position, listed_position) "
                 "VALUES (?, ?, ?, ?)",
                 (name, emoji, position, listed),
             )

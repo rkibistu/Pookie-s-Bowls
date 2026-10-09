@@ -103,6 +103,9 @@ export function createCatalog({ api }) {
     reorderRecipeCategories: (ids) =>
       save("PUT", "/api/recipe-categories/order", { category_ids: ids }),
     deleteRecipeCategory: (id) => save("DELETE", `/api/recipe-categories/${id}`),
+    /** List exactly these recipe categories on the Ingredients page, in this order: [id]. */
+    setListedRecipeCategories: (ids) =>
+      save("PUT", "/api/recipe-categories/listed", { category_ids: ids }),
     /** Add (on) or remove a person's heart on an ingredient or recipe item. */
     setFavorite: (item, person, on) =>
       save(
