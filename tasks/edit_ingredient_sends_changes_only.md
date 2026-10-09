@@ -8,7 +8,7 @@ Example: Mango is in Poke → Fresh. Her phone adds it to Burger → Toppings. O
 
 Idea: the dialog sends only what you changed (these sections ticked, these unticked), so sections you didn't touch stay as stored.
 
-Found while deciding `tasks/adding_never_duplicates.md`, which fixes the same problem for adding only. Less risky than adding was, since the dialog shows every station's ticks, but still a lost change.
+Found while deciding `tasks/completed/adding_never_duplicates.md`, which fixes the same problem for adding only. Less risky than adding was, since the dialog shows every station's ticks, but still a lost change.
 
 ## To decide
 - Ticked/unticked lists, or keep the full list and refuse when it was based on an old version?

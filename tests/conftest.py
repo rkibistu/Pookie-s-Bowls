@@ -41,6 +41,6 @@ def ingredient(conn, section):
     """Add an ingredient to the catalog, in one Poke section; returns its id."""
 
     def add(name, in_section="Protein"):
-        return ingredients.create(conn, {"name": name, "section_ids": [section(in_section)]})["id"]
+        return ingredients.add(conn, {"name": name, "section_ids": [section(in_section)]})["ingredient"]["id"]
 
     return add

@@ -915,6 +915,11 @@ body.selecting .ingredient-row.unpickable::after {
     cursor: default;
 }
 
+/* Adding an ingredient: sections it's already in can't be unticked. */
+.chip.already span {
+    opacity: 0.55;
+}
+
 /* Text that turns into a text box when tapped. */
 .editable {
     padding: 2px 4px;

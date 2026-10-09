@@ -1,6 +1,6 @@
 # Adding an ingredient never makes a duplicate
 
-Status: ready-for-agent
+Status: done
 
 Adding an ingredient should reuse one that's already in the catalog (see **Ingredient** in `CONTEXT.md`). Today the ingredient dialog makes that call itself, from the browser's copy of the catalog, and the server only refuses duplicates. That goes wrong in three ways:
 
@@ -49,7 +49,7 @@ pytest, through `ingredients.add` on the in-memory database:
 5. Adding to a section it's already in: `reused: true`, `added_to` empty.
 6. No sections: a new name becomes an orphan; an existing ingredient is unchanged.
 7. An unknown section, or a listed category's section: refused with "Unknown section.", nothing changed.
-8. The race: a name inserted between the lookup and the insert is reused, with no error.
+8. The race: not a separate test. Adding is one `INSERT … ON CONFLICT DO NOTHING` on the unique index, then a lookup by name, so there's no gap between looking and inserting; the conflict path is what test 2 exercises.
 9. HTTP: a new name returns 201, a reused one 200 (this replaces the 409 test in `tests/test_http.py`).
 
 The conftest fixtures and other tests that call `ingredients.create` switch to `add`.

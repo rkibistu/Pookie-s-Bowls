@@ -44,8 +44,10 @@ def list_ingredients():
 
 
 @app.post("/api/ingredients")
-def create_ingredient():
-    return jsonify(ingredients.create(db.get_db(), request.get_json(silent=True))), 201
+def add_ingredient():
+    """A taken name reuses that ingredient (200); a new one is created (201)."""
+    added = ingredients.add(db.get_db(), request.get_json(silent=True))
+    return jsonify(added), 200 if added["reused"] else 201
 
 
 @app.patch("/api/ingredients/<int:ingredient_id>")

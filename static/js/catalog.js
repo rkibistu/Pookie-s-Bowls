@@ -46,14 +46,18 @@ export function createCatalog({ api }) {
   }
 
   /**
-   * Send one change, after any still running; once it's saved, reload
-   * everything. Resolves to the server's answer after the reload; rejects
-   * with the server's error, and then nothing is reloaded.
+   * Send one change, after any still running; then reload everything, saved
+   * or not (a refused change may have been based on something the other
+   * phone has changed). Resolves to the server's answer, or rejects with its
+   * error, after the reload.
    */
   function save(method, url, body) {
     const sent = queue.then(() => api(method, url, body));
-    queue = sent.then(fetchAll, () => {});
-    return sent.then((answer) => queue.then(() => answer));
+    queue = sent.then(fetchAll, fetchAll);
+    return sent.then(
+      (answer) => queue.then(() => answer),
+      (err) => queue.then(() => Promise.reject(err)),
+    );
   }
 
   /** One recipe as the recipe dialog shows it (with hearts), after any saves. */
@@ -100,7 +104,11 @@ export function createCatalog({ api }) {
     /** Change only the fields given; resolves to the saved recipe. */
     changeRecipe: (id, fields) => save("PATCH", `/api/recipes/${id}`, fields),
     deleteRecipe: (id) => save("DELETE", `/api/recipes/${id}`),
-    createIngredient: (fields) => save("POST", "/api/ingredients", fields),
+    /**
+     * {name, section_ids}: a taken name reuses that ingredient, and adding only
+     * puts it into more sections. Resolves to {ingredient, reused, added_to}.
+     */
+    addIngredient: (fields) => save("POST", "/api/ingredients", fields),
     /** Change only the fields given; resolves to the saved ingredient. */
     changeIngredient: (id, fields) => save("PATCH", `/api/ingredients/${id}`, fields),
     deleteIngredient: (id) => save("DELETE", `/api/ingredients/${id}`),

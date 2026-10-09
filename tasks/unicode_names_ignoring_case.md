@@ -6,7 +6,7 @@ Ingredient, station and recipe category names are unique ignoring case (see `CON
 
 Example: *Ștevie* is in the catalog. Adding `ștevie` makes a second ingredient instead of reusing the first, and the dialog may have shown it as already there.
 
-Found while deciding `tasks/adding_never_duplicates.md`, which matches names exactly the way the unique index does, so it stays correct, but only as good as `NOCASE`.
+Found while deciding `tasks/completed/adding_never_duplicates.md`, which matches names exactly the way the unique index does, so it stays correct, but only as good as `NOCASE`.
 
 ## To decide
 - How the server folds names (e.g. Python `casefold()` into a stored key with the unique index on it). No migration needed: the database can be recreated.

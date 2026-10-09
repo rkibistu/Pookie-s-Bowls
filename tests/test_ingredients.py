@@ -15,8 +15,8 @@ def names_by_section(conn):
 
 
 def test_an_ingredient_in_two_sections_shows_up_under_both_a_to_z(conn, section):
-    ingredients.create(conn, {"name": "Tofu", "section_ids": [section("Protein"), section("Topping")]})
-    ingredients.create(conn, {"name": "  avocado ", "section_ids": [section("Topping")]})
+    ingredients.add(conn, {"name": "Tofu", "section_ids": [section("Protein"), section("Topping")]})
+    ingredients.add(conn, {"name": "  avocado ", "section_ids": [section("Topping")]})
 
     listed = names_by_section(conn)
 
@@ -26,8 +26,8 @@ def test_an_ingredient_in_two_sections_shows_up_under_both_a_to_z(conn, section)
 
 
 def test_an_ingredient_can_be_in_no_section_and_is_still_in_the_catalog(conn, section):
-    ingredients.create(conn, {"name": "Seaweed"})
-    tofu = ingredients.create(conn, {"name": "Tofu", "section_ids": [section("Protein")]})
+    ingredients.add(conn, {"name": "Seaweed"})
+    tofu = ingredients.add(conn, {"name": "Tofu", "section_ids": [section("Protein")]})["ingredient"]
     ingredients.change(conn, tofu["id"], {"section_ids": []})
 
     assert all(names == [] for names in names_by_section(conn).values())
@@ -47,22 +47,100 @@ def test_the_catalog_lists_every_ingredient_a_to_z_with_its_favorites(conn, ingr
     ]
 
 
-def test_a_name_is_taken_whatever_its_case(conn, section):
-    ingredients.create(conn, {"name": "Salmon", "section_ids": [section("Protein")]})
-    rice = ingredients.create(conn, {"name": "Rice", "section_ids": [section("Base")]})
+def test_a_rename_to_a_taken_name_is_refused_whatever_its_case(conn, ingredient):
+    ingredient("Salmon")
+    rice = ingredient("Rice", "Base")
 
-    for attempt in (
-        lambda: ingredients.create(conn, {"name": "salmon"}),
-        lambda: ingredients.change(conn, rice["id"], {"name": "SALMON"}),
-    ):
-        with pytest.raises(RuleError) as err:
-            attempt()
-        assert (err.value.kind, err.value.message) == (
-            DUPLICATE,
-            "An ingredient with that name already exists.",
-        )
-    assert names_by_section(conn)["Protein"] == ["Salmon"]
-    assert ingredients.get(conn, rice["id"])["name"] == "Rice"
+    with pytest.raises(RuleError) as err:
+        ingredients.change(conn, rice, {"name": "SALMON"})
+
+    assert (err.value.kind, err.value.message) == (
+        DUPLICATE,
+        "An ingredient with that name already exists.",
+    )
+    assert ingredients.get(conn, rice)["name"] == "Rice"
+
+
+# ---- Adding never makes a duplicate ----------------------------------------
+
+
+def test_adding_a_new_name_creates_it_in_the_given_sections(conn, section):
+    added = ingredients.add(
+        conn, {"name": " Mango ", "section_ids": [section("Topping"), section("Base")]}
+    )
+
+    assert added == {
+        "ingredient": {
+            "id": added["ingredient"]["id"],
+            "name": "Mango",
+            "section_ids": sorted([section("Base"), section("Topping")]),
+        },
+        "reused": False,
+        "added_to": sorted([section("Base"), section("Topping")]),
+    }
+
+
+def test_adding_a_taken_name_in_any_case_reuses_it_and_keeps_its_name(conn, ingredient):
+    avocado = ingredient("Avocado", "Topping")
+
+    added = ingredients.add(conn, {"name": " AVOCADO ", "section_ids": []})
+
+    assert added["reused"] is True
+    assert added["ingredient"]["id"] == avocado
+    assert added["ingredient"]["name"] == "Avocado"
+    assert [i["name"] for i in ingredients.list_all(conn)] == ["Avocado"]
+
+
+def test_adding_to_another_section_keeps_the_sections_it_was_in(conn, section, ingredient):
+    ingredient("Avocado", "Topping")
+
+    added = ingredients.add(conn, {"name": "avocado", "section_ids": [section("Base")]})
+
+    assert added["ingredient"]["section_ids"] == sorted([section("Base"), section("Topping")])
+    assert added["added_to"] == [section("Base")]
+
+
+def test_adding_keeps_sections_on_other_stations(conn, section):
+    burger = stations.create(conn, {"name": "Burger", "emoji": "🍔"})["id"]
+    toppings = stations.add_section(conn, burger, {"name": "Toppings"})["id"]
+    fresh = section("Fresh Vegetables / Fruits")
+    ingredients.add(conn, {"name": "Mango", "section_ids": [fresh, toppings]})
+
+    added = ingredients.add(conn, {"name": "Mango", "section_ids": [section("Extras")]})
+
+    assert added["ingredient"]["section_ids"] == sorted([fresh, toppings, section("Extras")])
+
+
+def test_adding_to_a_section_it_is_already_in_adds_nothing(conn, section, ingredient):
+    ingredient("Tofu", "Protein")
+
+    added = ingredients.add(conn, {"name": "Tofu", "section_ids": [section("Protein")]})
+
+    assert added["reused"] is True
+    assert added["added_to"] == []
+    assert added["ingredient"]["section_ids"] == [section("Protein")]
+
+
+def test_adding_with_no_sections_makes_an_orphan_or_changes_nothing(conn, section, ingredient):
+    seaweed = ingredients.add(conn, {"name": "Seaweed"})
+    assert (seaweed["reused"], seaweed["ingredient"]["section_ids"]) == (False, [])
+
+    ingredient("Tofu", "Protein")
+    tofu = ingredients.add(conn, {"name": "tofu"})
+    assert (tofu["reused"], tofu["added_to"]) == (True, [])
+    assert tofu["ingredient"]["section_ids"] == [section("Protein")]
+
+
+def test_adding_to_an_unknown_section_changes_nothing(conn, section, ingredient):
+    ingredient("Tofu", "Protein")
+
+    with pytest.raises(RuleError) as err:
+        ingredients.add(conn, {"name": "Tofu", "section_ids": [section("Base"), 999]})
+
+    assert (err.value.kind, err.value.message) == (INVALID, "Unknown section.")
+    assert [(i["name"], i["section_ids"]) for i in ingredients.list_all(conn)] == [
+        ("Tofu", [section("Protein")])
+    ]
 
 
 @pytest.mark.parametrize(
@@ -75,7 +153,7 @@ def test_a_name_is_taken_whatever_its_case(conn, section):
 )
 def test_a_new_ingredient_is_refused_when_a_field_is_wrong(conn, section, fields, message):
     with pytest.raises(RuleError) as err:
-        ingredients.create(conn, {"name": "Salmon", "section_ids": [section("Protein")], **fields})
+        ingredients.add(conn, {"name": "Salmon", "section_ids": [section("Protein")], **fields})
 
     assert (err.value.kind, err.value.message) == (INVALID, message)
 
@@ -84,15 +162,15 @@ def test_an_ingredient_cannot_go_in_a_listed_category(conn):
     sauce = next(s for s in stations.list_all(conn)[0]["sections"] if s["kind"] == "recipes")
 
     with pytest.raises(RuleError) as err:
-        ingredients.create(conn, {"name": "Salmon", "section_ids": [sauce["id"]]})
+        ingredients.add(conn, {"name": "Salmon", "section_ids": [sauce["id"]]})
 
     assert (err.value.kind, err.value.message) == (INVALID, "Unknown section.")
 
 
 def test_changing_only_the_name_keeps_the_sections(conn, section):
-    tofu = ingredients.create(
+    tofu = ingredients.add(
         conn, {"name": "Tofu", "section_ids": [section("Topping"), section("Protein")]}
-    )
+    )["ingredient"]
 
     changed = ingredients.change(conn, tofu["id"], {"name": "Smoked tofu"})
 

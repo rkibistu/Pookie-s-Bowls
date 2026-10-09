@@ -17,7 +17,7 @@ def bowl_category(client):
 
 
 def test_a_recipe_can_be_created_changed_and_deleted_over_http(client, bowl_category):
-    salmon = client.post("/api/ingredients", json={"name": "Salmon", "section_ids": [1]}).json
+    salmon = client.post("/api/ingredients", json={"name": "Salmon", "section_ids": [1]}).json["ingredient"]
 
     created = client.post(
         "/api/recipes",
@@ -47,12 +47,13 @@ def test_recipe_errors_come_back_as_json_with_a_status(client):
 
 
 def test_an_ingredient_can_be_changed_and_its_errors_come_back_as_json(client):
-    tofu = client.post("/api/ingredients", json={"name": "Tofu", "section_ids": [1]}).json
+    tofu = client.post("/api/ingredients", json={"name": "Tofu", "section_ids": [1]}).json["ingredient"]
+    rice = client.post("/api/ingredients", json={"name": "Rice"}).json["ingredient"]
 
     changed = client.patch(f"/api/ingredients/{tofu['id']}", json={"name": "Smoked tofu"})
     assert (changed.status_code, changed.json["section_ids"]) == (200, [1])
 
-    taken = client.post("/api/ingredients", json={"name": "smoked TOFU", "section_ids": [1]})
+    taken = client.patch(f"/api/ingredients/{rice['id']}", json={"name": "smoked TOFU"})
     assert (taken.status_code, taken.json) == (
         409,
         {"error": "An ingredient with that name already exists."},
@@ -61,6 +62,18 @@ def test_an_ingredient_can_be_changed_and_its_errors_come_back_as_json(client):
     assert client.put(f"/api/ingredients/{tofu['id']}/favorites/him").status_code == 400
 
     assert client.delete(f"/api/ingredients/{tofu['id']}").status_code == 204
+    assert client.delete(f"/api/ingredients/{rice['id']}").status_code == 204
+
+
+def test_adding_a_taken_name_reuses_it_over_http(client):
+    created = client.post("/api/ingredients", json={"name": "Mango", "section_ids": [1]})
+    assert (created.status_code, created.json["reused"]) == (201, False)
+
+    reused = client.post("/api/ingredients", json={"name": "MANGO", "section_ids": [1, 2]})
+    assert (reused.status_code, reused.json["reused"], reused.json["added_to"]) == (200, True, [2])
+    assert reused.json["ingredient"] == {"id": created.json["ingredient"]["id"], "name": "Mango", "section_ids": [1, 2]}
+
+    assert client.delete(f"/api/ingredients/{reused.json['ingredient']['id']}").status_code == 204
 
 
 def test_recipes_are_no_longer_replaced_whole(client):
@@ -120,12 +133,12 @@ def test_a_station_and_its_sections_can_be_changed_over_http(client):
 
 def test_every_ingredient_comes_back_including_orphans(client):
     seaweed = client.post("/api/ingredients", json={"name": "Seaweed"})
-    assert (seaweed.status_code, seaweed.json["section_ids"]) == (201, [])
+    assert (seaweed.status_code, seaweed.json["ingredient"]["section_ids"]) == (201, [])
 
     names = [i["name"] for i in client.get("/api/ingredients").json["ingredients"]]
     assert "Seaweed" in names
 
-    assert client.delete(f"/api/ingredients/{seaweed.json['id']}").status_code == 204
+    assert client.delete(f"/api/ingredients/{seaweed.json['ingredient']['id']}").status_code == 204
 
 
 def test_a_station_can_be_created_and_deleted_over_http(client):

@@ -160,21 +160,23 @@ test("saves run one after another, in the order they were made", async () => {
   assert.ok(patched !== -1 && patched < favorited, server.calls.join("\n"));
 });
 
-test("a failed save says why and leaves the lists as they were", async () => {
+test("a failed save says why, after reloading what the server has", async () => {
   const server = fakeServer();
   const catalog = createCatalog({ api: server.api });
   await catalog.reload();
   let redraws = 0;
   catalog.onChange(() => redraws++);
   server.fail = "DELETE /api/recipes/7";
+  // Meanwhile, the other phone renamed it.
+  server.data["/api/recipes"].recipes[0].name = "Hot mayo";
 
   await assert.rejects(catalog.deleteRecipe(7), { message: "Server is down" });
 
-  assert.equal(redraws, 0);
-  assert.deepEqual(catalog.recipes().map((r) => r.name), ["Spicy mayo"]);
+  assert.equal(redraws, 1);
+  assert.deepEqual(catalog.recipes().map((r) => r.name), ["Hot mayo"]);
   server.fail = null;
   await catalog.deleteRecipe(7); // the next save still goes through
-  assert.equal(redraws, 1);
+  assert.equal(redraws, 2);
 });
 
 test("the station shown is the one selected, or the first when it's gone", async () => {

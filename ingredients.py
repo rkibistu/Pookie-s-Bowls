@@ -64,21 +64,36 @@ def _section_ids(conn, ingredient_id=None):
 # ---- Writing -------------------------------------------------------------
 
 
-def create(conn, fields):
-    """Save a new ingredient; a name is required, section_ids may be left out
-    (an orphan)."""
+def add(conn, fields):
+    """Add an ingredient to the sections given; never makes a duplicate.
+
+    A name already in the catalog (ignoring case) reuses that ingredient and
+    keeps its name; adding only ever puts it into more sections. section_ids
+    may be left out (a new one is an orphan). Returns {ingredient, reused,
+    added_to}: added_to is the section ids it wasn't in before.
+    """
     if not isinstance(fields, dict):
         raise RuleError("Expected a JSON object.")
     ingredient = _parse(
         conn, {"name": fields.get("name"), "section_ids": fields.get("section_ids", [])}
     )
-    try:
-        with conn:
-            cur = conn.execute("INSERT INTO ingredients (name) VALUES (?)", (ingredient["name"],))
-            _write_sections(conn, cur.lastrowid, ingredient["section_ids"])
-    except sqlite3.IntegrityError:
-        raise _duplicate_name()
-    return get(conn, cur.lastrowid)
+    with conn:
+        # The unique index decides "same name", so the lookup can't disagree
+        # with it, and two adds at once can't both insert.
+        reused = conn.execute(
+            "INSERT INTO ingredients (name) VALUES (?) ON CONFLICT DO NOTHING",
+            (ingredient["name"],),
+        ).rowcount == 0
+        ingredient_id = conn.execute(
+            "SELECT id FROM ingredients WHERE name = ? COLLATE NOCASE", (ingredient["name"],)
+        ).fetchone()[0]
+        already = set(_section_ids(conn, ingredient_id).get(ingredient_id, []))
+        added_to = [s for s in ingredient["section_ids"] if s not in already]
+        conn.executemany(
+            "INSERT INTO section_ingredients (section_id, ingredient_id) VALUES (?, ?)",
+            [(s, ingredient_id) for s in added_to],
+        )
+    return {"ingredient": get(conn, ingredient_id), "reused": reused, "added_to": added_to}
 
 
 def change(conn, ingredient_id, fields):

@@ -1,7 +1,7 @@
 // The ingredient dialog: editing one ingredient (its name, its sections on
 // every station, deleting it), or adding one. Adding suggests existing
-// ingredients as you type and never makes a duplicate: choosing one, or
-// typing its name in any case, puts that ingredient where you're adding it.
+// ingredients as you type; the server decides whether the name is new or
+// reuses one (adding never makes a duplicate, and only ever adds sections).
 
 import { catalog } from "./catalog.js";
 import { el, renderChips, resetDeleteButton, showDialogError, showToast } from "./dom.js";
@@ -12,7 +12,8 @@ let editing = null; // the ingredient being edited, or null while adding
 // one), or {} (the All ingredients page: tick sections on any station, or
 // none for an orphan).
 let adding = null;
-let chosen = null; // while adding: the existing ingredient chosen from the suggestions
+let chipView = null; // {stations, folded}: the section chips being shown
+let recognisedId = null; // while adding: the existing ingredient the name matches, if any
 
 const nameInput = () => document.getElementById("ingredient-name");
 const storedIngredient = (id) => catalog.ingredients().find((i) => i.id === id);
@@ -28,7 +29,6 @@ function stationsCurrentFirst() {
 export function openIngredientDialog(ingredient) {
   editing = storedIngredient(ingredient.id) ?? ingredient;
   adding = null;
-  chosen = null;
   show({
     title: "Edit ingredient",
     name: editing.name,
@@ -46,7 +46,6 @@ export function openIngredientDialog(ingredient) {
 export function openAddIngredient(where = {}) {
   editing = null;
   adding = where;
-  chosen = null;
   let chipStations = [];
   if (where.station) chipStations = [where.station];
   else if (!where.section) chipStations = stationsCurrentFirst();
@@ -63,7 +62,9 @@ function show({ title, name, chipStations, selected, folded }) {
   document.getElementById("ingredient-dialog-title").textContent = title;
   nameInput().value = name;
   document.getElementById("ingredient-suggestions").hidden = true;
-  renderSectionChips(chipStations, selected, folded);
+  chipView = { stations: chipStations, folded };
+  recognisedId = null;
+  renderSectionChips(selected);
   document.getElementById("ingredient-sections-field").hidden = chipStations.length === 0;
   document.getElementById("ingredient-delete").hidden = !editing;
   resetDeleteButton("ingredient-delete");
@@ -77,11 +78,13 @@ function show({ title, name, chipStations, selected, folded }) {
  * One group of chips per station: the ingredient sections it's in. None
  * ticked is fine. Each group folds open and shut; folded, it starts shut
  * unless something in it is ticked. Its title counts what's ticked.
+ * already: sections it's in already, shown ticked and greyed out (adding
+ * can't take it out of them).
  */
-function renderSectionChips(stations, selected, folded = false) {
+function renderSectionChips(selected, already = new Set()) {
   const box = document.getElementById("ingredient-section-chips");
   box.replaceChildren();
-  for (const station of stations) {
+  for (const station of chipView.stations) {
     const sections = ingredientSections(station);
     const group = el("details", "chip-group");
     const title = el("summary", "chip-group-title");
@@ -90,7 +93,13 @@ function renderSectionChips(stations, selected, folded = false) {
     group.append(title, chips);
     if (sections.length === 0) chips.append(el("p", "dialog-hint", "No ingredient sections yet"));
     box.append(group);
-    if (sections.length) renderChips(chips.id, sections, selected);
+    if (sections.length) renderChips(chips.id, sections, new Set([...selected, ...already]));
+    for (const input of chips.querySelectorAll("input")) {
+      if (!already.has(Number(input.value))) continue;
+      input.disabled = true;
+      input.parentElement.classList.add("already");
+      input.parentElement.title = "Already here";
+    }
 
     const countTicked = () => {
       const ticked = chips.querySelectorAll("input:checked").length;
@@ -98,81 +107,72 @@ function renderSectionChips(stations, selected, folded = false) {
       return ticked;
     };
     chips.addEventListener("change", countTicked);
-    group.open = !folded || countTicked() > 0;
+    group.open = !chipView.folded || countTicked() > 0;
     countTicked();
   }
 }
 
-const checkedSectionIds = () =>
-  [...document.querySelectorAll("#ingredient-section-chips input:checked")].map((box) =>
-    Number(box.value),
-  );
+/** The sections ticked; newOnly leaves out the greyed-out ones it's already in. */
+const tickedSectionIds = ({ newOnly = false } = {}) =>
+  [
+    ...document.querySelectorAll(
+      `#ingredient-section-chips input:checked${newOnly ? ":not(:disabled)" : ""}`,
+    ),
+  ].map((box) => Number(box.value));
 
-/** A suggestion was chosen: that ingredient is the one being added. */
-function choose(item) {
-  const ingredient = storedIngredient(item.id);
-  if (!adding.station && !adding.section) {
-    openIngredientDialog(ingredient); // every station's chips: that's editing it
-    return;
-  }
-  chosen = ingredient;
-  nameInput().value = ingredient.name;
-  if (adding.station) {
-    renderSectionChips([adding.station], new Set(ingredient.section_ids));
-  }
-}
-
-/** The existing ingredient being added, if any: the one chosen, or one with that name. */
+/** The ingredient in the catalog with this name, ignoring case, if any. */
 function existingIngredient(name) {
-  if (chosen) return chosen;
   const wanted = name.trim().toLowerCase();
   return catalog.ingredients().find((i) => i.name.toLowerCase() === wanted) ?? null;
 }
 
 /**
- * Where an existing ingredient ends up: added to the section, set to this
- * station's ticks, or (on All ingredients) added to whatever is ticked.
+ * While adding: when the name starts or stops matching an existing
+ * ingredient, grey out the sections it's in, keeping what's ticked. Only
+ * for show: the server decides on save.
  */
-function placedSectionIds(existing) {
-  const ids = new Set(existing.section_ids);
-  if (adding.section) ids.add(adding.section.id);
-  if (adding.station) {
-    for (const s of ingredientSections(adding.station)) ids.delete(s.id);
-  }
-  for (const id of checkedSectionIds()) ids.add(id);
-  return [...ids];
+function recogniseName() {
+  if (editing) return;
+  const existing = existingIngredient(nameInput().value);
+  if ((existing?.id ?? null) === recognisedId) return;
+  recognisedId = existing?.id ?? null;
+  const ticked = new Set(tickedSectionIds({ newOnly: true }));
+  renderSectionChips(ticked, new Set(existing?.section_ids ?? []));
 }
 
-/** "Protein, Topping": the sections it's being added to here. */
-function placesHere() {
-  if (adding.section) return [adding.section.name];
-  const ticked = new Set(checkedSectionIds());
-  const stations = adding.station ? [adding.station] : catalog.stations();
-  return stations.flatMap((station) =>
-    ingredientSections(station)
-      .filter((s) => ticked.has(s.id))
-      .map((s) => (adding.station ? s.name : `${station.name} · ${s.name}`)),
-  );
+/** A suggestion was chosen: it fills in the name, same as typing it. */
+function choose(item) {
+  nameInput().value = storedIngredient(item.id)?.name ?? item.name;
+  recogniseName();
+}
+
+/** "Protein", or "Poke · Protein" on All ingredients: the section as named here. */
+function sectionLabel(id) {
+  for (const station of catalog.stations()) {
+    const section = ingredientSections(station).find((s) => s.id === id);
+    if (!section) continue;
+    return adding.station || adding.section ? section.name : `${station.name} · ${section.name}`;
+  }
+  return null;
 }
 
 async function save() {
   const name = nameInput().value;
   if (editing) {
-    await catalog.changeIngredient(editing.id, { name, section_ids: checkedSectionIds() });
+    await catalog.changeIngredient(editing.id, { name, section_ids: tickedSectionIds() });
     return;
   }
-  const existing = existingIngredient(name);
-  if (!existing) {
-    const sectionIds = adding.section ? [adding.section.id] : checkedSectionIds();
-    await catalog.createIngredient({ name, section_ids: sectionIds });
-    return;
-  }
-  const places = placesHere();
-  await catalog.changeIngredient(existing.id, { section_ids: placedSectionIds(existing) });
+  const sectionIds = adding.section ? [adding.section.id] : tickedSectionIds({ newOnly: true });
+  const { ingredient, reused, added_to } = await catalog.addIngredient({
+    name,
+    section_ids: sectionIds,
+  });
+  if (!reused) return;
+  const places = added_to.map(sectionLabel).filter(Boolean);
   showToast(
     places.length
-      ? `${existing.name} was already in the catalog, added to ${places.join(", ")}`
-      : `${existing.name} is already in the catalog`,
+      ? `${ingredient.name} was already in the catalog, added to ${places.join(", ")}`
+      : `${ingredient.name} is already in the catalog`,
   );
 }
 
@@ -214,9 +214,7 @@ export function initIngredientDialog() {
     pickOnEnter: false,
     noMatch: null,
   });
-  nameInput().addEventListener("input", () => {
-    if (chosen && nameInput().value !== chosen.name) chosen = null;
-  });
+  nameInput().addEventListener("input", recogniseName);
   document.getElementById("ingredient-form").addEventListener("submit", submit);
   document.getElementById("ingredient-delete").addEventListener("click", deleteIngredient);
   document

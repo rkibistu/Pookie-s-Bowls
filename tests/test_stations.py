@@ -157,9 +157,9 @@ def test_a_listed_category_is_not_renamed_as_a_section(conn, poke):
 
 def test_deleting_a_section_leaves_its_ingredients_in_the_catalog(conn, poke, section, ingredient):
     salmon = ingredient("Salmon")
-    tofu = ingredients.create(
+    tofu = ingredients.add(
         conn, {"name": "Tofu", "section_ids": [section("Protein"), section("Topping")]}
-    )["id"]
+    )["ingredient"]["id"]
 
     stations.delete_section(conn, section("Protein"))
 
@@ -252,7 +252,7 @@ def test_an_ingredient_can_be_in_sections_on_two_stations(conn, poke, section):
     burger = stations.create(conn, {"name": "Burger", "emoji": "🍔"})["id"]
     patty = stations.add_section(conn, burger, {"name": "Patty"})["id"]
 
-    salmon = ingredients.create(conn, {"name": "Salmon", "section_ids": [section("Protein"), patty]})
+    salmon = ingredients.add(conn, {"name": "Salmon", "section_ids": [section("Protein"), patty]})["ingredient"]
 
     assert [i["name"] for i in stations.get(conn, burger)["sections"][0]["items"]] == ["Salmon"]
     assert salmon["section_ids"] == sorted([section("Protein"), patty])
@@ -267,7 +267,7 @@ def test_two_stations_can_have_sections_with_the_same_name(conn):
 def test_deleting_a_station_leaves_its_ingredients_as_orphans(conn, poke, ingredient):
     burger = stations.create(conn, {"name": "Burger", "emoji": "🍔"})["id"]
     patty = stations.add_section(conn, burger, {"name": "Patty"})["id"]
-    beef = ingredients.create(conn, {"name": "Beef", "section_ids": [patty]})["id"]
+    beef = ingredients.add(conn, {"name": "Beef", "section_ids": [patty]})["ingredient"]["id"]
     salmon = ingredient("Salmon")
 
     stations.delete(conn, burger)
