@@ -9,7 +9,7 @@ function fakeServer() {
     calls: [],
     fail: null, // "GET /api/recipes" → that request fails
     data: {
-      "/api/recipe-categories": { categories: [{ id: 1, slug: "bowl", name: "Poke bowl", emoji: "🥣" }] },
+      "/api/recipe-categories": { categories: [{ id: 1, name: "Poke bowl", emoji: "🥣" }] },
       "/api/ingredients": {
         categories: [
           { id: 1, slug: "protein", name: "Protein", ingredients: [{ id: 2, name: "Tofu", favorites: [] }] },
@@ -17,7 +17,7 @@ function fakeServer() {
           { id: 3, slug: "extras", name: "Extras", ingredients: [{ id: 2, name: "Tofu", favorites: [] }] },
         ],
         recipe_sections: [
-          { id: 2, slug: "sauce", name: "Sauce", emoji: "🥫", recipes: [{ id: 7, name: "Spicy mayo", favorites: [] }] },
+          { id: 2, name: "Sauce", emoji: "🥫", recipes: [{ id: 7, name: "Spicy mayo", favorites: [] }] },
         ],
       },
       "/api/recipes": { recipes: [{ id: 7, name: "Spicy mayo", categories: [], components: [] }] },
@@ -63,7 +63,7 @@ test("a reload fills both lists and tells every view", async () => {
   });
   assert.equal(catalog.listedRecipeSections()[0].recipes[0].type, "recipe");
   assert.deepEqual(catalog.recipes().map((r) => r.name), ["Spicy mayo"]);
-  assert.deepEqual(catalog.recipeCategories().map((c) => c.slug), ["bowl"]);
+  assert.deepEqual(catalog.recipeCategories().map((c) => c.name), ["Poke bowl"]);
 });
 
 test("a failed reload keeps the lists it had and says what went wrong", async () => {
@@ -87,7 +87,7 @@ test("a failed reload keeps the lists it had and says what went wrong", async ()
   assert.deepEqual(catalog.recipes(), []);
 });
 
-test("after a save, both lists reload and every view hears about it", async () => {
+test("after a save, everything reloads and every view hears about it", async () => {
   const server = fakeServer();
   const catalog = createCatalog({ api: server.api });
   await catalog.reload();
@@ -102,8 +102,20 @@ test("after a save, both lists reload and every view hears about it", async () =
   assert.equal(redraws, 1);
   assert.deepEqual(
     server.calls.filter((c) => !c.startsWith("done")),
-    ["PATCH /api/recipes/7", "GET /api/ingredients", "GET /api/recipes"],
+    ["PATCH /api/recipes/7", "GET /api/recipe-categories", "GET /api/ingredients", "GET /api/recipes"],
   );
+});
+
+test("a recipe category change shows up in the categories after the reload", async () => {
+  const server = fakeServer();
+  const catalog = createCatalog({ api: server.api });
+  await catalog.reload();
+  server.data["/api/recipe-categories"].categories.unshift({ id: 4, name: "Pizza", emoji: "🍕" });
+
+  await catalog.createRecipeCategory({ name: "Pizza", emoji: "🍕" });
+
+  assert.ok(server.calls.includes("POST /api/recipe-categories"));
+  assert.deepEqual(catalog.recipeCategories().map((c) => c.name), ["Pizza", "Poke bowl"]);
 });
 
 test("saves run one after another, in the order they were made", async () => {

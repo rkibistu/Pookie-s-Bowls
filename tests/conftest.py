@@ -24,8 +24,8 @@ def conn():
 
 @pytest.fixture
 def category(conn):
-    """Recipe category id by slug: category("sauce")."""
-    ids = dict(conn.execute("SELECT slug, id FROM recipe_categories"))
+    """Recipe category id by name: category("Sauce")."""
+    ids = dict(conn.execute("SELECT name, id FROM recipe_categories"))
     return ids.__getitem__
 
 

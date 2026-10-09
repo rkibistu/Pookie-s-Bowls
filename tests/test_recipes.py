@@ -9,13 +9,13 @@ def test_a_new_recipe_comes_back_with_its_categories_and_components_in_pick_orde
 ):
     rice = ingredient("Rice")
     salmon = ingredient("Salmon")
-    mayo = recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("sauce")]})
+    mayo = recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("Sauce")]})
 
     bowl = recipes.create(
         conn,
         {
             "name": "  Salmon bowl ",
-            "category_ids": [category("bowl")],
+            "category_ids": [category("Poke bowl")],
             "components": [
                 {"type": "ingredient", "id": salmon},
                 {"type": "recipe", "id": mayo["id"], "name": "ignored"},
@@ -26,7 +26,7 @@ def test_a_new_recipe_comes_back_with_its_categories_and_components_in_pick_orde
 
     assert recipes.get(conn, bowl["id"]) == bowl
     assert bowl["name"] == "Salmon bowl"
-    assert [c["slug"] for c in bowl["categories"]] == ["bowl"]
+    assert [c["name"] for c in bowl["categories"]] == ["Poke bowl"]
     assert [(c["type"], c["name"]) for c in bowl["components"]] == [
         ("ingredient", "Salmon"),
         ("recipe", "Spicy mayo"),
@@ -35,16 +35,16 @@ def test_a_new_recipe_comes_back_with_its_categories_and_components_in_pick_orde
 
 
 def test_a_bowl_stays_editable_after_its_sauce_becomes_a_soup(conn, category):
-    mayo = recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("sauce")]})
+    mayo = recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("Sauce")]})
     bowl = recipes.create(
         conn,
         {
             "name": "Salmon bowl",
-            "category_ids": [category("bowl")],
+            "category_ids": [category("Poke bowl")],
             "components": [{"type": "recipe", "id": mayo["id"]}],
         },
     )
-    recipes.change(conn, mayo["id"], {"category_ids": [category("soup")]})
+    recipes.change(conn, mayo["id"], {"category_ids": [category("Soup")]})
 
     changed = recipes.change(conn, bowl["id"], {"notes": "extra lime"})
 
@@ -54,12 +54,12 @@ def test_a_bowl_stays_editable_after_its_sauce_becomes_a_soup(conn, category):
 
 
 def test_a_recipe_cannot_end_up_inside_itself(conn, category):
-    mayo = recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("sauce")]})
+    mayo = recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("Sauce")]})
     bowl = recipes.create(
         conn,
         {
             "name": "Salmon bowl",
-            "category_ids": [category("bowl")],
+            "category_ids": [category("Poke bowl")],
             "components": [{"type": "recipe", "id": mayo["id"]}],
         },
     )
@@ -86,14 +86,14 @@ def test_a_recipe_cannot_end_up_inside_itself(conn, category):
 )
 def test_a_new_recipe_is_refused_when_a_field_is_wrong(conn, category, fields, message):
     with pytest.raises(RuleError) as err:
-        recipes.create(conn, {"name": "Salmon bowl", "category_ids": [category("bowl")], **fields})
+        recipes.create(conn, {"name": "Salmon bowl", "category_ids": [category("Poke bowl")], **fields})
 
     assert (err.value.kind, err.value.message) == (INVALID, message)
 
 
 def test_a_link_without_a_scheme_becomes_https(conn, category):
     bowl = recipes.create(
-        conn, {"name": "Salmon bowl", "category_ids": [category("bowl")], "url": " example.com/poke "}
+        conn, {"name": "Salmon bowl", "category_ids": [category("Poke bowl")], "url": " example.com/poke "}
     )
 
     assert bowl["url"] == "https://example.com/poke"
@@ -107,12 +107,12 @@ def test_a_missing_recipe_is_not_found(conn):
 
 
 def test_deleting_a_sauce_takes_it_out_of_the_bowls_that_had_it(conn, category):
-    mayo = recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("sauce")]})
+    mayo = recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("Sauce")]})
     bowl = recipes.create(
         conn,
         {
             "name": "Salmon bowl",
-            "category_ids": [category("bowl")],
+            "category_ids": [category("Poke bowl")],
             "components": [{"type": "recipe", "id": mayo["id"]}],
         },
     )
@@ -128,17 +128,17 @@ def test_deleting_a_sauce_takes_it_out_of_the_bowls_that_had_it(conn, category):
 
 def test_the_list_shows_the_newest_recipe_first(conn, category):
     for name in ("Spicy mayo", "Salmon bowl", "Miso soup"):
-        recipes.create(conn, {"name": name, "category_ids": [category("bowl")]})
+        recipes.create(conn, {"name": name, "category_ids": [category("Poke bowl")]})
 
     assert [r["name"] for r in recipes.list_all(conn)] == ["Miso soup", "Salmon bowl", "Spicy mayo"]
 
 
 def test_only_listed_recipes_get_a_card_on_the_ingredients_page(conn, category):
-    recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("sauce")]})
-    recipes.create(conn, {"name": "Salmon bowl", "category_ids": [category("bowl")]})
+    recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("Sauce")]})
+    recipes.create(conn, {"name": "Salmon bowl", "category_ids": [category("Poke bowl")]})
 
     sections = recipes.listed_sections(conn)
 
-    assert [(s["slug"], [r["name"] for r in s["recipes"]]) for s in sections] == [
-        ("sauce", ["Spicy mayo"])
+    assert [(s["name"], [r["name"] for r in s["recipes"]]) for s in sections] == [
+        ("Sauce", ["Spicy mayo"])
     ]

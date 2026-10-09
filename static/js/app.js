@@ -1,5 +1,6 @@
 // Pookie's Bowls — entry point: wires every view once the page has loaded.
 
+import { initCategoriesDialog } from "./categories-dialog.js";
 import { catalog } from "./catalog.js";
 import { initIngredients } from "./ingredients.js";
 import { initNewRecipe } from "./new-recipe.js";
@@ -15,6 +16,7 @@ function init() {
   initNewRecipe();
   initRecipes();
   initRecipeDialog();
+  initCategoriesDialog();
   catalog.reload();
 }
 

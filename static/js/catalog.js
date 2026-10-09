@@ -13,20 +13,19 @@ export function createCatalog({ api }) {
   let ingredientCategories = []; // each with its ingredients, as items
   let listedRecipeSections = []; // recipe categories shown with them (e.g. sauces)
   let recipes = []; // newest first
-  let recipeCategories = []; // fixed on the server, loaded once
+  let recipeCategories = []; // in their order
   let loadError = null; // what went wrong with the last reload, if anything
   const listeners = [];
   let queue = Promise.resolve(); // saves and reloads run one after another
 
   async function fetchAll() {
     try {
-      if (recipeCategories.length === 0) {
-        recipeCategories = (await api("GET", "/api/recipe-categories")).categories;
-      }
-      const [lists, recipeList] = await Promise.all([
+      const [categoryList, lists, recipeList] = await Promise.all([
+        api("GET", "/api/recipe-categories"),
         api("GET", "/api/ingredients"),
         api("GET", "/api/recipes"),
       ]);
+      recipeCategories = categoryList.categories;
       ingredientCategories = lists.categories.map((c) => ({
         ...c,
         ingredients: asItems(c.ingredients, "ingredient"),
@@ -97,6 +96,13 @@ export function createCatalog({ api }) {
     /** Change only the fields given; resolves to the saved ingredient. */
     changeIngredient: (id, fields) => save("PATCH", `/api/ingredients/${id}`, fields),
     deleteIngredient: (id) => save("DELETE", `/api/ingredients/${id}`),
+    createRecipeCategory: (fields) => save("POST", "/api/recipe-categories", fields),
+    /** Change only the fields given (name and/or emoji). */
+    changeRecipeCategory: (id, fields) => save("PATCH", `/api/recipe-categories/${id}`, fields),
+    /** Put every recipe category in this order: [id]. */
+    reorderRecipeCategories: (ids) =>
+      save("PUT", "/api/recipe-categories/order", { category_ids: ids }),
+    deleteRecipeCategory: (id) => save("DELETE", `/api/recipe-categories/${id}`),
     /** Add (on) or remove a person's heart on an ingredient or recipe item. */
     setFavorite: (item, person, on) =>
       save(

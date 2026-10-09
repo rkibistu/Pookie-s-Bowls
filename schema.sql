@@ -29,17 +29,21 @@ CREATE TABLE IF NOT EXISTS ingredient_categories (
     PRIMARY KEY (ingredient_id, category_id)
 );
 
--- Fixed recipe categories (seeded on first run): poke bowl, sauce, soup…
--- Recipes in a category with in_ingredient_list = 1 (e.g. sauces) are shown
--- in the ingredient list and can be picked into other recipes.
+-- Recipe categories (poke bowl, sauce, soup… seeded on a fresh database; the
+-- people using the app add, rename, reorder and delete them). Recipes in a
+-- category with in_ingredient_list = 1 (e.g. sauces) are shown in the
+-- ingredient list and can be picked into other recipes.
 CREATE TABLE IF NOT EXISTS recipe_categories (
     id                 INTEGER PRIMARY KEY,
-    slug               TEXT    NOT NULL UNIQUE,
     name               TEXT    NOT NULL,
     emoji              TEXT    NOT NULL,
     position           INTEGER NOT NULL DEFAULT 0,
     in_ingredient_list INTEGER NOT NULL DEFAULT 0 CHECK (in_ingredient_list IN (0, 1))
 );
+
+-- Recipe category names are unique, ignoring case.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_recipe_categories_name
+    ON recipe_categories (name COLLATE NOCASE);
 
 -- All recipes. Each may have a link (url) and/or components; both are
 -- optional. What it is lives in its categories.

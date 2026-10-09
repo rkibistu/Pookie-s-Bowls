@@ -8,6 +8,7 @@ import db
 import errors
 import favorites
 import ingredients
+import recipe_categories
 import recipes
 
 app = Flask(__name__)
@@ -16,7 +17,8 @@ app.teardown_appcontext(db.close_db)
 # Ensure the database and seed data exist before serving any request.
 db.init_db()
 
-# The rules live in ingredients.py and recipes.py; these routes only speak HTTP.
+# The rules live in ingredients.py, recipes.py and recipe_categories.py; these
+# routes only speak HTTP.
 
 STATUS = {errors.INVALID: 400, errors.NOT_FOUND: 404, errors.DUPLICATE: 409}
 
@@ -83,16 +85,35 @@ def set_favorite(kind, item_id, person):
 
 @app.get("/api/recipe-categories")
 def list_recipe_categories():
-    rows = db.get_db().execute(
-        "SELECT id, slug, name, emoji, in_ingredient_list FROM recipe_categories "
-        "ORDER BY position, id"
-    )
+    return jsonify(categories=recipe_categories.list_all(db.get_db()))
+
+
+@app.post("/api/recipe-categories")
+def create_recipe_category():
+    created = recipe_categories.create(db.get_db(), request.get_json(silent=True))
+    return jsonify(created), 201
+
+
+@app.patch("/api/recipe-categories/<int:category_id>")
+def change_recipe_category(category_id):
+    """Change only the fields sent (name and/or emoji)."""
     return jsonify(
-        categories=[
-            {**dict(r), "in_ingredient_list": bool(r["in_ingredient_list"])}
-            for r in rows
-        ]
+        recipe_categories.change(db.get_db(), category_id, request.get_json(silent=True))
     )
+
+
+@app.put("/api/recipe-categories/order")
+def reorder_recipe_categories():
+    """Body: {category_ids: [every category id, in the new order]}."""
+    body = request.get_json(silent=True)
+    category_ids = body.get("category_ids") if isinstance(body, dict) else None
+    return jsonify(categories=recipe_categories.reorder(db.get_db(), category_ids))
+
+
+@app.delete("/api/recipe-categories/<int:category_id>")
+def delete_recipe_category(category_id):
+    recipe_categories.delete(db.get_db(), category_id)
+    return "", 204
 
 
 @app.get("/api/recipes")

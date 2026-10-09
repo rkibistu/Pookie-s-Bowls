@@ -40,6 +40,7 @@
 
         <section class="view" id="view-recipes" hidden>
             <div class="toolbar">
+                <button type="button" class="secondary-btn" id="recipe-categories-btn">🏷️ Categories</button>
                 <button type="button" class="primary-btn" id="new-recipe-link-btn">+ New recipe</button>
             </div>
             <p class="load-error" id="recipes-error" hidden></p>
@@ -181,6 +182,27 @@
             <button type="button" class="danger-btn" id="recipe-delete">Delete</button>
             <span class="spacer"></span>
             <button type="button" class="secondary-btn" id="recipe-close">Close</button>
+        </div>
+    </dialog>
+
+    <dialog class="dialog" id="categories-dialog">
+        <h2>🏷️ Recipe categories</h2>
+        <p class="dialog-hint">The first one is where a new recipe starts.</p>
+        <ul class="category-rows" id="category-rows"></ul>
+
+        <form class="category-row category-add" id="category-add-form" novalidate>
+            <input type="text" class="category-emoji" id="category-add-emoji" maxlength="8"
+                   autocomplete="off" placeholder="🍕" aria-label="New category's emoji">
+            <input type="text" class="category-name" id="category-add-name" maxlength="40"
+                   autocomplete="off" placeholder="New category…" aria-label="New category's name">
+            <button type="submit" class="secondary-btn">Add</button>
+        </form>
+
+        <p class="form-error" id="categories-error" hidden></p>
+
+        <div class="dialog-actions">
+            <span class="spacer"></span>
+            <button type="button" class="secondary-btn" id="categories-close">Close</button>
         </div>
     </dialog>
 

@@ -1,5 +1,5 @@
 // Recipe categories (poke bowl, sauce, soup…) as the views show them; the
-// list itself comes from the catalog.
+// list itself, in its order, comes from the catalog.
 
 import { catalog } from "./catalog.js";
 
@@ -7,9 +7,9 @@ import { catalog } from "./catalog.js";
 export const categoryChipOptions = () =>
   catalog.recipeCategories().map((c) => ({ id: c.id, name: `${c.emoji} ${c.name}` }));
 
-/** A new recipe starts as a poke bowl. */
+/** A new recipe starts in the first category. */
 export const defaultCategoryIds = () =>
-  new Set(catalog.recipeCategories().filter((c) => c.slug === "bowl").map((c) => c.id));
+  new Set(catalog.recipeCategories().slice(0, 1).map((c) => c.id));
 
 /** A recipe's emoji: its first category's. */
 export function recipeEmoji(recipe) {

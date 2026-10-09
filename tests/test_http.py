@@ -13,7 +13,7 @@ def client():
 @pytest.fixture
 def bowl_category(client):
     categories = client.get("/api/recipe-categories").json["categories"]
-    return next(c["id"] for c in categories if c["slug"] == "bowl")
+    return categories[0]["id"]  # Poke bowl comes first
 
 
 def test_a_recipe_can_be_created_changed_and_deleted_over_http(client, bowl_category):
@@ -66,3 +66,26 @@ def test_an_ingredient_can_be_changed_and_its_errors_come_back_as_json(client):
 def test_recipes_are_no_longer_replaced_whole(client):
     assert client.put("/api/recipes/1", json={}).status_code == 405
     assert client.put("/api/ingredients/1", json={}).status_code == 405
+
+
+def test_a_recipe_category_can_be_created_changed_reordered_and_deleted_over_http(client):
+    created = client.post("/api/recipe-categories", json={"name": "Pizza", "emoji": "🍕"})
+    assert created.status_code == 201
+    pizza = created.json["id"]
+
+    changed = client.patch(f"/api/recipe-categories/{pizza}", json={"emoji": "🍕🔥"})
+    assert (changed.status_code, changed.json["emoji"]) == (200, "🍕🔥")
+
+    ids = [c["id"] for c in client.get("/api/recipe-categories").json["categories"]]
+    moved = client.put("/api/recipe-categories/order", json={"category_ids": [pizza, *ids[:-1]]})
+    assert (moved.status_code, moved.json["categories"][0]["name"]) == (200, "Pizza")
+    assert client.put("/api/recipe-categories/order", json={}).status_code == 400
+
+    taken = client.post("/api/recipe-categories", json={"name": "pizza", "emoji": "🍕"})
+    assert (taken.status_code, taken.json) == (
+        409,
+        {"error": "A category with that name already exists."},
+    )
+
+    assert client.delete(f"/api/recipe-categories/{pizza}").status_code == 204
+    assert client.delete(f"/api/recipe-categories/{pizza}").status_code == 404

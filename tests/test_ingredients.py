@@ -80,7 +80,7 @@ def test_deleting_an_ingredient_takes_it_out_of_the_recipes_that_had_it(conn, ca
         conn,
         {
             "name": "Salmon bowl",
-            "category_ids": [category("bowl")],
+            "category_ids": [category("Poke bowl")],
             "components": [{"type": "ingredient", "id": salmon}],
         },
     )

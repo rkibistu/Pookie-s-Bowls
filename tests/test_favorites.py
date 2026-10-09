@@ -9,7 +9,7 @@ from errors import INVALID, NOT_FOUND, RuleError
 @pytest.fixture
 def sauce(conn, category):
     """A recipe to favorite; returns its id."""
-    return recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("sauce")]})["id"]
+    return recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("Sauce")]})["id"]
 
 
 def test_me_comes_before_her_whoever_was_first(conn, ingredient):

@@ -57,7 +57,7 @@ def listed_sections(conn):
     sections = [
         {**dict(r), "recipes": []}
         for r in conn.execute(
-            "SELECT id, slug, name, emoji FROM recipe_categories "
+            "SELECT id, name, emoji FROM recipe_categories "
             "WHERE in_ingredient_list = 1 ORDER BY position, id"
         )
     ]
@@ -94,14 +94,14 @@ def _categories(conn, recipe_id=None):
     where, params = ("WHERE l.recipe_id = ?", (recipe_id,)) if recipe_id else ("", ())
     categories = {}
     for r in conn.execute(
-        "SELECT l.recipe_id, c.id, c.slug, c.name, c.emoji "
+        "SELECT l.recipe_id, c.id, c.name, c.emoji "
         "FROM recipe_category_links l "
         f"JOIN recipe_categories c ON c.id = l.category_id {where} "
         "ORDER BY c.position, c.id",
         params,
     ):
         categories.setdefault(r["recipe_id"], []).append(
-            {"id": r["id"], "slug": r["slug"], "name": r["name"], "emoji": r["emoji"]}
+            {"id": r["id"], "name": r["name"], "emoji": r["emoji"]}
         )
     return categories
 
