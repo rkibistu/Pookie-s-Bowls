@@ -49,19 +49,25 @@
 
     <main class="app-main">
         <section class="view" id="view-station">
-            <div class="toolbar">
-                <button type="button" class="secondary-btn" id="station-btn">✏️ Station</button>
-                <button type="button" class="secondary-btn" id="new-recipe-btn">🥣 New recipe</button>
-                <button type="button" class="primary-btn" id="add-ingredient-btn">+ Add</button>
+            <!-- Phones: a bar along the bottom of the screen (see .action-bar). -->
+            <div class="toolbar action-bar">
+                <button type="button" class="secondary-btn" id="station-btn">
+                    <svg class="bar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="btn-label">✏️ Station</span></button>
+                <button type="button" class="secondary-btn" id="new-recipe-btn">
+                    <svg class="bar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h18a9 9 0 0 1-18 0Z"/><path d="M9 7c0-1.5 1-1.5 1-3M14 7c0-1.5 1-1.5 1-3"/></svg><span class="btn-label">🥣 New recipe</span></button>
+                <button type="button" class="primary-btn action-main" id="add-ingredient-btn">
+                    <svg class="bar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="btn-label">+ Add</span></button>
             </div>
             <p class="load-error" id="station-error" hidden></p>
             <div id="station-sections"></div>
         </section>
 
         <section class="view" id="view-recipes" hidden>
-            <div class="toolbar">
-                <button type="button" class="secondary-btn" id="recipe-categories-btn">🏷️ Categories</button>
-                <button type="button" class="primary-btn" id="new-recipe-link-btn">+ New recipe</button>
+            <div class="toolbar action-bar">
+                <button type="button" class="secondary-btn" id="recipe-categories-btn">
+                    <svg class="bar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg><span class="btn-label">🏷️ Categories</span></button>
+                <button type="button" class="primary-btn" id="new-recipe-link-btn">
+                    <svg class="bar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="btn-label">+ New recipe</span></button>
             </div>
             <p class="load-error" id="recipes-error" hidden></p>
             <section class="filter-panel" id="recipe-filter" aria-label="Filter recipes" hidden>
