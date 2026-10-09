@@ -3,6 +3,7 @@
 import { initAllIngredients } from "./all-ingredients.js";
 import { initCategoriesDialog } from "./categories-dialog.js";
 import { catalog } from "./catalog.js";
+import { initEmojiPicker } from "./emoji-picker.js";
 import { initIngredientDialog } from "./ingredient-dialog.js";
 import { initNewRecipe } from "./new-recipe.js";
 import { pickSession } from "./pick-session.js";
@@ -23,6 +24,7 @@ function init() {
   initCategoriesDialog();
   initStationDialog();
   initAllIngredients();
+  initEmojiPicker();
   catalog.reload();
 }
 

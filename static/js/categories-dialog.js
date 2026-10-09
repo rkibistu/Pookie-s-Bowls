@@ -4,6 +4,7 @@
 
 import { catalog } from "./catalog.js";
 import { el, showDialogError } from "./dom.js";
+import { attachEmojiPicker } from "./emoji-picker.js";
 
 let armedId = null; // the category whose 🗑 was tapped once, if any
 
@@ -42,6 +43,7 @@ function fieldInput(category, field, className, label) {
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") input.blur();
   });
+  if (field === "emoji") attachEmojiPicker(input);
   input.addEventListener("change", () => {
     const value = input.value.trim();
     if (value === category[field]) return;
@@ -121,5 +123,6 @@ export function initCategoriesDialog() {
   });
   document.getElementById("recipe-categories-btn").addEventListener("click", openCategoriesDialog);
   document.getElementById("category-add-form").addEventListener("submit", addCategory);
+  attachEmojiPicker(document.getElementById("category-add-emoji"));
   document.getElementById("categories-close").addEventListener("click", () => dialog.close());
 }

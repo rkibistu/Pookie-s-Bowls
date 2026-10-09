@@ -7,6 +7,7 @@
 
 import { catalog } from "./catalog.js";
 import { el, resetDeleteButton, showDialogError, showToast } from "./dom.js";
+import { attachEmojiPicker } from "./emoji-picker.js";
 import { showStation } from "./station.js";
 
 let armedId = null; // the section whose 🗑 was tapped once, if any
@@ -280,6 +281,9 @@ export function initStationDialog() {
   });
   document.getElementById("section-add-form").addEventListener("submit", addSection);
   document.getElementById("station-category-add-form").addEventListener("submit", addCategory);
+  for (const id of ["station-emoji", "station-category-add-emoji", "new-station-emoji"]) {
+    attachEmojiPicker(document.getElementById(id));
+  }
   document.getElementById("station-btn").addEventListener("click", openStationDialog);
   document.getElementById("station-close").addEventListener("click", () => dialog.close());
   document.getElementById("station-delete").addEventListener("click", deleteStation);
