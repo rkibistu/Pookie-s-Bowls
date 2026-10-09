@@ -24,9 +24,10 @@
 
     <nav class="app-nav">
         <div class="station-nav" id="station-nav"></div>
+        <button type="button" class="nav-btn" data-view="recipes">📖 Recipes</button>
+        <button type="button" class="nav-btn" data-view="all">🧺 All ingredients</button>
         <button type="button" class="nav-btn nav-add" id="new-station-btn"
                 title="New station" aria-label="New station">＋</button>
-        <button type="button" class="nav-btn" data-view="recipes">📖 Recipes</button>
     </nav>
 
     <main class="app-main">
@@ -61,6 +62,19 @@
                 </div>
             </section>
             <div id="recipe-list"></div>
+        </section>
+
+        <section class="view" id="view-all" hidden>
+            <div class="toolbar">
+                <label class="toggle">
+                    <input type="checkbox" id="only-orphans">
+                    <span>Only orphans</span>
+                </label>
+                <span class="spacer"></span>
+                <button type="button" class="primary-btn" id="all-add-ingredient-btn">+ Add ingredient</button>
+            </div>
+            <p class="load-error" id="all-error" hidden></p>
+            <section class="category-card" id="all-ingredients"></section>
         </section>
     </main>
 

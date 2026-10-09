@@ -565,6 +565,7 @@ body {
 body.selecting #new-station-btn,
 body.selecting .nav-btn[data-view="recipes"],
 body.selecting #add-ingredient-btn,
+body.selecting #all-add-ingredient-btn,
 body.selecting #station-btn,
 body.selecting #new-recipe-btn,
 body.selecting .fav-hint,
@@ -1226,4 +1227,31 @@ body.selecting .ingredient-row.unpickable::after {
 
 .section-row.unlisted .section-label span {
     color: var(--muted);
+}
+
+/* ---- All ingredients page --------------------------------------------- */
+.toolbar .spacer {
+    flex: 1;
+}
+
+.toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.toggle input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+}
+
+/* Where an ingredient appears ("🥣 Poke · Protein"), or "on no station". */
+.ingredient-where {
+    flex-basis: 100%;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: normal;
 }

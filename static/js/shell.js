@@ -2,9 +2,9 @@
 // shown. Both survive reloads in localStorage (per device).
 
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
-const VIEW_KEY = "pookie-view"; // "station" | "recipes"
+const VIEW_KEY = "pookie-view"; // "station" | "recipes" | "all"
 const STATION_KEY = "pookie-station"; // the id of the station used last
-const VIEWS = ["station", "recipes"];
+const VIEWS = ["station", "recipes", "all"];
 
 const identityListeners = [];
 const viewListeners = [];
@@ -54,7 +54,7 @@ export function saveStationId(id) {
   localStorage.setItem(STATION_KEY, String(id));
 }
 
-/** The view being shown: "station" | "recipes". */
+/** The view being shown: "station" | "recipes" | "all" (All ingredients). */
 export function currentView() {
   const view = localStorage.getItem(VIEW_KEY);
   return VIEWS.includes(view) ? view : "station";

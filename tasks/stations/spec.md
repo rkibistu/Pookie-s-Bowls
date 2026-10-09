@@ -29,7 +29,7 @@ Terms are in `CONTEXT.md`: **Station**, **Section**, **Ingredient section**, **L
       - ingredient sections: add, rename, delete
       - recipe categories: tick to list or untick to unlist, as in the Sections dialog today
     - deleting the station
-  - **+ New station** sits at the end of the station buttons in the nav. A new station starts with no sections.
+  - **＋ New station** is the very last button in the nav, after 🧺 All ingredients. A new station starts with no sections.
 - **Adding ingredients:**
   - The toolbar's **+ Add ingredient** button stays. Typing suggests existing ingredients, as the recipe dialog's "+ Add ingredient…" box does, and you tick which of this station's ingredient sections it goes in (none is allowed).
   - Each ingredient section's header gets a **"+"** that does the same, straight into that section.

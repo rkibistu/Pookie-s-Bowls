@@ -100,19 +100,22 @@ function rowButton(className, text, label, onClick) {
 }
 
 /**
- * One ingredient or recipe row: name + hearts, then ✏️ and ＋ (start a recipe
- * with it) with a mouse, or ⋯ (a menu with both) on touch screens. ＋ sits at
- * the end, where picking mode shows its ＋ too.
+ * One ingredient or recipe row: name + hearts (and detail, if given, e.g.
+ * where it appears), then ✏️ and ＋ (start a recipe with it) with a mouse, or
+ * ⋯ (a menu with both) on touch screens. ＋ sits at the end, where picking
+ * mode shows its ＋ too. The All ingredients page uses these rows as well.
  */
-function renderItemRow(item) {
+export function renderItemRow(item, detail = null) {
   const row = el("li", "ingredient-row");
   const pickState = pickSession.state(item);
   const pop = justFavorited && justFavorited.key === itemKey(item) ? justFavorited.person : null;
   if (pickState === "picked") row.classList.add("picked");
   if (pickState === "blocked") row.classList.add("unpickable");
 
+  const label = renderItemLabel(item, pop);
+  if (detail) label.append(el("span", "ingredient-where", detail));
   row.append(
-    renderItemLabel(item, pop),
+    label,
     rowButton("row-edit", "✏️", `Edit ${item.name}`, () => editItem(item)),
     rowButton("row-start", "＋", `Start a recipe with ${item.name}`, () => startRecipeWith(item)),
     rowButton("row-more", "⋯", `More for ${item.name}`, () => toggleRowMenu(row, item)),
@@ -209,7 +212,7 @@ async function toggleFavorite(item, isFavorite) {
 let editingIngredient = null; // null while adding, the ingredient while editing
 
 /** Open the add/edit dialog; pass an ingredient to edit it. */
-function openIngredientDialog(ingredient = null) {
+export function openIngredientDialog(ingredient = null) {
   editingIngredient = ingredient;
   // A row's item has no section ids; the catalog's ingredient does.
   const stored = ingredient && catalog.ingredients().find((i) => i.id === ingredient.id);
