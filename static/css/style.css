@@ -52,7 +52,6 @@ body {
 /* ---- Header ----------------------------------------------------------- */
 .app-header {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
@@ -77,32 +76,28 @@ body {
     color: var(--accent-ink);
 }
 
-.identity {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.identity-label {
-    color: var(--muted);
-    font-size: 0.9rem;
+/* Phones only: the header names the page instead (see the side menu). */
+.page-title {
+    display: none;
 }
 
 .identity-toggle {
+    flex: none;
     display: flex;
     background: var(--accent-soft);
     border-radius: 999px;
-    padding: 4px;
-    gap: 4px;
+    padding: 3px;
+    gap: 2px;
 }
 
 .identity-btn {
     border: none;
     background: transparent;
-    padding: 8px 16px;
+    min-height: 28px;
+    padding: 4px 10px;
     border-radius: 999px;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.8rem;
     color: var(--accent-ink);
     transition: background 0.2s ease, color 0.2s ease;
 }
@@ -154,6 +149,198 @@ body {
     border-color: var(--accent);
     color: var(--accent-ink);
     font-weight: 600;
+}
+
+/* The side menu's own parts show only on phones. */
+.menu-btn,
+.menu-backdrop,
+.menu-header,
+.menu-heading,
+.nav-add-label,
+.menu-identity {
+    display: none;
+}
+
+/* ---- Side menu (phones) ----------------------------------------------- */
+/* The nav row becomes a menu sliding in from the left, opened with the
+   floating ☰; the header keeps the page's name and Me/Her. */
+@media (max-width: 640px) {
+    .app-header {
+        min-height: 62px;
+        padding: 12px 16px 0 72px;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .brand,
+    .app-header .identity-toggle {
+        display: none;
+    }
+
+    .app-main {
+        padding: 16px;
+    }
+
+    .page-title {
+        display: block;
+        flex: 1;
+        min-width: 0;
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--accent-ink);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .menu-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        top: 10px;
+        left: 12px;
+        z-index: 30;
+        width: 48px;
+        height: 48px;
+        border: none;
+        border-radius: 50%;
+        background: var(--surface);
+        color: var(--accent-ink);
+        box-shadow: 0 6px 20px rgba(30, 20, 40, 0.14);
+        cursor: pointer;
+    }
+
+    .menu-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        background: rgba(30, 20, 40, 0.4);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+    }
+
+    body.menu-open .menu-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .app-nav {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 41;
+        width: min(292px, 85vw);
+        flex-direction: column;
+        gap: 2px;
+        margin: 0;
+        padding: 14px 12px 20px;
+        overflow-y: auto;
+        background: var(--surface);
+        border-radius: 0 22px 22px 0;
+        box-shadow: 12px 0 40px rgba(30, 20, 40, 0.25);
+        /* Hidden (and out of the tab order) until opened. */
+        visibility: hidden;
+        transform: translateX(-105%);
+        transition: transform 0.25s ease, visibility 0.25s;
+    }
+
+    body.menu-open .app-nav {
+        visibility: visible;
+        transform: none;
+    }
+
+    .menu-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 4px 4px 14px 6px;
+    }
+
+    .menu-title {
+        flex: 1;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--accent-ink);
+    }
+
+    .menu-close {
+        flex: none;
+        width: 40px;
+        height: 40px;
+        border: none;
+        border-radius: 50%;
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .app-nav .nav-btn {
+        width: 100%;
+        min-height: 48px;
+        padding: 0 14px;
+        border: none;
+        border-radius: 12px;
+        background: transparent;
+        box-shadow: none;
+        text-align: left;
+    }
+
+    .app-nav .nav-btn.active {
+        background: var(--accent-soft);
+    }
+
+    /* Recipes, the stations (and ＋ New station), then All ingredients. */
+    .menu-heading {
+        display: block;
+        order: 1;
+        margin: 18px 14px 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+    }
+
+    .station-nav .nav-btn {
+        order: 2;
+    }
+
+    .app-nav .nav-add {
+        order: 3;
+        font-weight: normal;
+    }
+
+    .nav-add-label {
+        display: inline;
+    }
+
+    .app-nav .nav-all {
+        order: 4;
+        margin-top: 12px;
+        position: relative;
+    }
+
+    .app-nav .nav-all::before {
+        content: "";
+        position: absolute;
+        top: -7px;
+        left: 0;
+        right: 0;
+        border-top: 1px solid var(--border);
+    }
+
+    /* Me/Her: rarely switched, so at the bottom of the menu, centered. */
+    .menu-identity {
+        display: flex;
+        order: 5;
+        align-self: center;
+        margin-top: auto;
+    }
 }
 
 /* ---- Main ------------------------------------------------------------- */
@@ -231,8 +418,16 @@ body {
     flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 12px;
+    gap: 8px;
     margin-bottom: 16px;
+}
+
+/* A page's own actions: small, so a phone fits them on one row. */
+.toolbar .primary-btn,
+.toolbar .secondary-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    white-space: nowrap;
 }
 
 .load-error,
@@ -448,13 +643,6 @@ body {
     100% { transform: scale(1); }
 }
 
-.fav-hint {
-    flex: 1;
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.85rem;
-}
-
 /* ＋ on a row: start a recipe with it (the same ＋ as while picking). */
 .row-start {
     color: var(--muted);
@@ -569,7 +757,6 @@ body.selecting #all-add-ingredient-btn,
 body.selecting .section-add,
 body.selecting #station-btn,
 body.selecting #new-recipe-btn,
-body.selecting .fav-hint,
 body.selecting .ingredient-row .icon-btn,
 body.selecting .row-menu {
     display: none;

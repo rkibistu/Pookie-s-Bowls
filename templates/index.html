@@ -12,31 +12,47 @@
             <span class="brand-emoji">🥗</span>
             <h1>Pookie's Bowls</h1>
         </div>
+        <span class="page-title" id="page-title"></span>
 
-        <div class="identity" id="identity">
-            <span class="identity-label">Who are you?</span>
-            <div class="identity-toggle">
-                <button type="button" class="identity-btn" data-who="me">😎 Me</button>
-                <button type="button" class="identity-btn" data-who="her">🌸 Her</button>
-            </div>
+        <div class="identity-toggle" role="group" aria-label="Who are you?">
+            <button type="button" class="identity-btn" data-who="me">😎 Me</button>
+            <button type="button" class="identity-btn" data-who="her">🌸 Her</button>
         </div>
     </header>
 
-    <nav class="app-nav">
+    <!-- Phones: the nav is a side menu, opened with ☰. -->
+    <button type="button" class="menu-btn" id="menu-btn"
+            aria-label="Open menu" aria-controls="app-nav" aria-expanded="false">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <div class="menu-backdrop" id="menu-backdrop"></div>
+
+    <nav class="app-nav" id="app-nav">
+        <div class="menu-header">
+            <span class="brand-emoji">🥗</span>
+            <span class="menu-title">Pookie's Bowls</span>
+            <button type="button" class="menu-close" id="menu-close" aria-label="Close menu">✕</button>
+        </div>
         <button type="button" class="nav-btn" data-view="recipes">📖 Recipes</button>
+        <span class="menu-heading">Stations</span>
         <div class="station-nav" id="station-nav"></div>
-        <button type="button" class="nav-btn" data-view="all">🧺 All ingredients</button>
+        <button type="button" class="nav-btn nav-all" data-view="all">🧺 All ingredients</button>
         <button type="button" class="nav-btn nav-add" id="new-station-btn"
-                title="New station" aria-label="New station">＋</button>
+                title="New station" aria-label="New station">＋<span class="nav-add-label"> New station</span></button>
+        <!-- Phones: Me/Her lives at the bottom of the menu instead of the header. -->
+        <div class="identity-toggle menu-identity" role="group" aria-label="Who are you?">
+            <button type="button" class="identity-btn" data-who="me">😎 Me</button>
+            <button type="button" class="identity-btn" data-who="her">🌸 Her</button>
+        </div>
     </nav>
 
     <main class="app-main">
         <section class="view" id="view-station">
             <div class="toolbar">
-                <p class="fav-hint" id="fav-hint"></p>
                 <button type="button" class="secondary-btn" id="station-btn">✏️ Station</button>
                 <button type="button" class="secondary-btn" id="new-recipe-btn">🥣 New recipe</button>
-                <button type="button" class="primary-btn" id="add-ingredient-btn">+ Add ingredient</button>
+                <button type="button" class="primary-btn" id="add-ingredient-btn">+ Add</button>
             </div>
             <p class="load-error" id="station-error" hidden></p>
             <div id="station-sections"></div>
@@ -71,7 +87,7 @@
                     <span>Only orphans</span>
                 </label>
                 <span class="spacer"></span>
-                <button type="button" class="primary-btn" id="all-add-ingredient-btn">+ Add ingredient</button>
+                <button type="button" class="primary-btn" id="all-add-ingredient-btn">+ Add</button>
             </div>
             <p class="load-error" id="all-error" hidden></p>
             <section class="category-card" id="all-ingredients"></section>

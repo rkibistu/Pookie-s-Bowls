@@ -5,18 +5,18 @@
 import { catalog } from "./catalog.js";
 import { el } from "./dom.js";
 import { openAddIngredient, openIngredientDialog } from "./ingredient-dialog.js";
-import { HEARTS, itemKey, renderItemLabel } from "./items.js";
+import { itemKey, renderItemLabel } from "./items.js";
 import { pickNewRecipe } from "./new-recipe.js";
 import { pickSession } from "./pick-session.js";
 import { openRecipe } from "./recipe-dialog.js";
 import {
   currentIdentity,
   currentView,
-  onIdentityChange,
   onViewChange,
   saveStationId,
   savedStationId,
   setView,
+  syncPageTitle,
 } from "./shell.js";
 
 /** After the catalog reloads: its error, if any, the station buttons, then the list. */
@@ -40,6 +40,7 @@ function renderStationNav() {
     btn.addEventListener("click", () => showStation(station.id));
     nav.append(btn);
   }
+  syncPageTitle();
 }
 
 /** Show this station (remembered on this device); a pick session keeps its picks. */
@@ -51,9 +52,6 @@ export function showStation(id) {
 
 /** One card per section of the station, in its order. */
 function renderStation() {
-  // Double-clicking a row toggles the current identity's heart.
-  document.getElementById("fav-hint").textContent =
-    `${touchOnly.matches ? "Double-tap" : "Double-click"} to ${HEARTS[currentIdentity()]}`;
   const container = document.getElementById("station-sections");
   container.replaceChildren();
   const station = catalog.currentStation();
@@ -230,7 +228,6 @@ export function initStation() {
   catalog.selectStation(savedStationId());
   catalog.onChange(catalogChanged);
   onViewChange(renderStationNav);
-  // Rows show picks, and the hint shows whose heart a double-tap adds.
+  // Rows show picks.
   pickSession.onChange(renderStation);
-  onIdentityChange(renderStation);
 }

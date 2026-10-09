@@ -1,5 +1,6 @@
-// The app shell: who is using it (identity → color theme) and which view is
-// shown. Both survive reloads in localStorage (per device).
+// The app shell: who is using it (identity → color theme), which view is
+// shown, and on phones the side menu holding the nav. Identity and view
+// survive reloads in localStorage (per device).
 
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
 const VIEW_KEY = "pookie-view"; // "station" | "recipes" | "all"
@@ -43,6 +44,19 @@ export function setView(view) {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
   viewListeners.forEach((listener) => listener());
+  syncPageTitle();
+}
+
+/** Phones show the page's name in the header: the highlighted nav button's. */
+export function syncPageTitle() {
+  const active = document.querySelector(".app-nav .nav-btn.active");
+  document.getElementById("page-title").textContent = active ? active.textContent : "";
+}
+
+/** Open or close the side menu (phones only; wider screens show the nav as a row). */
+function setMenuOpen(open) {
+  document.body.classList.toggle("menu-open", open);
+  document.getElementById("menu-btn").setAttribute("aria-expanded", String(open));
 }
 
 /** The id of the station used last on this device, or null. */
@@ -71,5 +85,16 @@ export function initShell() {
   setView(currentView());
   document.querySelectorAll(".nav-btn[data-view]").forEach((btn) => {
     btn.addEventListener("click", () => setView(btn.dataset.view));
+  });
+
+  // Any choice in the menu, the ✕, a tap beside it or Escape closes it.
+  document.getElementById("menu-btn").addEventListener("click", () => setMenuOpen(true));
+  document.getElementById("menu-close").addEventListener("click", () => setMenuOpen(false));
+  document.getElementById("menu-backdrop").addEventListener("click", () => setMenuOpen(false));
+  document.getElementById("app-nav").addEventListener("click", (event) => {
+    if (event.target.closest(".nav-btn")) setMenuOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setMenuOpen(false);
   });
 }
