@@ -51,7 +51,7 @@ _Avoid_: shown category, ingredient-list category
 ### Building recipes
 
 **Recipe category**:
-A group a recipe is in (🥣 Poke bowl, 🥫 Sauce, 🍲 Soup…), with a name and an emoji. They are created, renamed, reordered and deleted from the Recipes page. Their order decides a recipe's emoji (its first category's) and which one a recipe started from the Recipes page begins in (the first). A recipe is in at least one, and can be in several. Its name is unique (see **Same name**).
+A group a recipe is in (🥣 Poke bowl, 🥫 Sauce, 🍲 Soup…), with a name and an emoji. They are created, renamed, reordered and deleted from the Recipes page; one can also be created while setting up a station. Their order decides a recipe's emoji (its first category's) and which one a recipe started from the Recipes page begins in (the first). A recipe is in at least one, and can be in several. Its name is unique (see **Same name**).
 _Avoid_: recipe type, kind
 
 **Listed recipe**:

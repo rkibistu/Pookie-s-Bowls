@@ -250,6 +250,13 @@
                        autocomplete="off" placeholder="New ingredient section…" aria-label="New section's name">
                 <button type="submit" class="secondary-btn">Add</button>
             </form>
+            <form class="category-row category-add" id="station-category-add-form" novalidate>
+                <input type="text" class="category-emoji" id="station-category-add-emoji" maxlength="8"
+                       autocomplete="off" placeholder="🍔" aria-label="New category's emoji">
+                <input type="text" class="category-name" id="station-category-add-name" maxlength="40"
+                       autocomplete="off" placeholder="New recipe category…" aria-label="New category's name">
+                <button type="submit" class="secondary-btn">Add</button>
+            </form>
         </div>
 
         <p class="form-error" id="station-dialog-error" hidden></p>

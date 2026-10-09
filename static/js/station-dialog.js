@@ -1,8 +1,9 @@
 // The Station dialog: the station being shown, its name and emoji, the
 // recipe category its new recipes start in, and its sections in one ↑/↓
 // list — ingredient sections (rename, delete, add) mixed with the recipe
-// categories it lists (tick to list, untick to unlist). Each change saves as
-// soon as it's made. Also the New station dialog, and deleting a station.
+// categories it lists (tick to list, untick to unlist) — and a new recipe
+// category, without leaving for the Recipes page. Each change saves as soon
+// as it's made. Also the New station dialog, and deleting a station.
 
 import { catalog } from "./catalog.js";
 import { el, resetDeleteButton, showDialogError, showToast } from "./dom.js";
@@ -181,6 +182,26 @@ async function addSection(event) {
   if (await run(() => catalog.addSection(station.id, { name: name.value }))) name.value = "";
 }
 
+/**
+ * A new recipe category, not listed. If the station's new recipes start in
+ * "the first recipe category", they start in this one now; a category already
+ * chosen stays.
+ */
+async function addCategory(event) {
+  event.preventDefault();
+  const form = document.getElementById("station-category-add-form");
+  const station = catalog.currentStation();
+  const startsInFirst = station.recipe_category_id == null;
+  const added = await run(async () => {
+    const category = await catalog.createRecipeCategory({
+      name: document.getElementById("station-category-add-name").value,
+      emoji: document.getElementById("station-category-add-emoji").value,
+    });
+    if (startsInFirst) await catalog.changeStation(station.id, { recipe_category_id: category.id });
+  });
+  if (added) form.reset();
+}
+
 /** First tap arms the button, second tap deletes; the last station can't go. */
 async function deleteStation() {
   const del = document.getElementById("station-delete");
@@ -238,6 +259,7 @@ function openStationDialog() {
   resetStationDelete();
   showDialogError(null, "station-dialog-error");
   document.getElementById("section-add-name").value = "";
+  document.getElementById("station-category-add-form").reset();
   document.getElementById("station-emoji").value = "";
   document.getElementById("station-name").value = "";
   render();
@@ -257,6 +279,7 @@ export function initStationDialog() {
     run(() => catalog.changeStation(station.id, { recipe_category_id: value ? Number(value) : null }));
   });
   document.getElementById("section-add-form").addEventListener("submit", addSection);
+  document.getElementById("station-category-add-form").addEventListener("submit", addCategory);
   document.getElementById("station-btn").addEventListener("click", openStationDialog);
   document.getElementById("station-close").addEventListener("click", () => dialog.close());
   document.getElementById("station-delete").addEventListener("click", deleteStation);
