@@ -69,3 +69,15 @@ _Avoid_: builder, selection mode, building mode
 **Draft**:
 A new recipe that is being written in the New recipe dialog and has not been saved yet.
 _Avoid_: new recipe form, build
+
+**Quantity**:
+How much of one item goes into one recipe: an amount (a number, 0 until filled in) and a unit (g, kg, ml, l, tsp, tbsp, cup, pcs, pinch). Every item in every recipe has one, whether or not it is shown. Changing the recipe's categories never clears it.
+_Avoid_: amount (on its own), measure
+
+**Shows quantities**:
+A recipe category's setting, on unless turned off. A recipe shows its quantities when at least one of its categories shows quantities.
+_Avoid_: quantity mode
+
+**Last unit**:
+The unit an item starts with when it goes into a recipe: the one last chosen for it in a saved recipe, or g until then. Changing it never changes recipes already saved.
+_Avoid_: default unit

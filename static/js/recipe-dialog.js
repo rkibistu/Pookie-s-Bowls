@@ -13,6 +13,7 @@ import {
 import { initItemSearch } from "./item-search.js";
 import { itemKey, renderComponentRow } from "./items.js";
 import { pickSession } from "./pick-session.js";
+import { quantityControls } from "./quantities.js";
 import { categoryChipOptions } from "./recipe-categories.js";
 
 let shownRecipe = null; // recipe shown in the recipe dialog
@@ -76,11 +77,25 @@ function renderRecipeDialog() {
   notes.classList.toggle("empty", !recipe.notes);
 }
 
-/** One of the shown recipe's ingredient rows (✕ to remove while editing). */
+/**
+ * One of the shown recipe's ingredient rows: its quantity, if the recipe
+ * shows them, saved as soon as it changes; ✕ to remove while editing.
+ */
 function renderRecipeComponent(component) {
   const key = itemKey(component);
+  // No redraw after it's saved, so the cursor can go on to the next box.
+  const changeQuantity = (change) =>
+    saveRecipePatch(
+      {
+        components: shownRecipe.components.map((c) =>
+          itemKey(c) === key ? { ...c, ...change } : c,
+        ),
+      },
+      { redraw: false },
+    );
   return renderComponentRow(component, {
     onOpen: () => openRecipe(component.id),
+    quantity: shownRecipe.shows_quantities ? quantityControls(component, changeQuantity) : null,
     onRemove: editingIngredients
       ? () =>
           saveRecipePatch({
@@ -90,8 +105,11 @@ function renderRecipeComponent(component) {
   });
 }
 
-/** Save some of the shown recipe's fields, then redraw it from the server's answer. */
-async function saveRecipePatch(fields) {
+/**
+ * Save some of the shown recipe's fields, then redraw it from the server's
+ * answer (unless redraw is false: what's shown already matches it).
+ */
+async function saveRecipePatch(fields, { redraw = true } = {}) {
   const id = shownRecipe.id;
   const dialog = document.getElementById("recipe-dialog");
   const stillShown = () => dialog.open && shownRecipe.id === id;
@@ -100,7 +118,7 @@ async function saveRecipePatch(fields) {
     if (stillShown()) {
       shownRecipe = recipe;
       showDialogError(null, "recipe-error");
-      renderRecipeDialog();
+      if (redraw) renderRecipeDialog();
     }
     showToast("Saved ✓");
   } catch (err) {

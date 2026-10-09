@@ -42,8 +42,8 @@ def test_the_catalog_lists_every_ingredient_a_to_z_with_its_favorites(conn, ingr
     ingredient("Avocado", "Topping")
 
     assert ingredients.list_all(conn) == [
-        {"id": 2, "name": "Avocado", "section_ids": [5], "favorites": []},
-        {"id": 1, "name": "tofu", "section_ids": [1], "favorites": []},
+        {"id": 2, "name": "Avocado", "last_unit": "g", "section_ids": [5], "favorites": []},
+        {"id": 1, "name": "tofu", "last_unit": "g", "section_ids": [1], "favorites": []},
     ]
 
 

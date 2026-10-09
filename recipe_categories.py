@@ -3,7 +3,9 @@
 Every function takes the database connection to work on and returns plain
 dicts; a broken rule raises RuleError. Nothing here knows about HTTP.
 
-A recipe category has a name, unique (names.py), and an emoji. Their order
+A recipe category has a name, unique (names.py), an emoji, and whether it
+shows quantities (on for a new one): a recipe shows its quantities when at
+least one of its categories does. Their order
 decides a recipe's emoji (its first category's) and the category a new recipe
 starts in (the first). Every recipe stays in at least one category, so the
 last one can't be deleted.
@@ -18,7 +20,8 @@ import names
 
 from errors import DUPLICATE, NOT_FOUND, RuleError
 
-FIELDS = ("name", "emoji")
+FIELDS = ("name", "emoji")  # what a new category is given
+CHANGEABLE = (*FIELDS, "shows_quantities")
 
 
 # ---- Reading -------------------------------------------------------------
@@ -29,14 +32,14 @@ def list_all(conn):
     return [
         _as_dict(r)
         for r in conn.execute(
-            "SELECT id, name, emoji FROM recipe_categories ORDER BY position, id"
+            "SELECT id, name, emoji, shows_quantities FROM recipe_categories ORDER BY position, id"
         )
     ]
 
 
 def get(conn, category_id):
     row = conn.execute(
-        "SELECT id, name, emoji FROM recipe_categories WHERE id = ?",
+        "SELECT id, name, emoji, shows_quantities FROM recipe_categories WHERE id = ?",
         (category_id,),
     ).fetchone()
     if row is None:
@@ -45,7 +48,7 @@ def get(conn, category_id):
 
 
 def _as_dict(row):
-    return dict(row)
+    return {**dict(row), "shows_quantities": bool(row["shows_quantities"])}
 
 
 # ---- Writing -------------------------------------------------------------
@@ -69,11 +72,12 @@ def create(conn, fields):
 
 
 def change(conn, category_id, fields):
-    """Change only the fields given (name and/or emoji); the rest stays as stored."""
+    """Change only the fields given (name, emoji, shows_quantities); the rest
+    stays as stored."""
     get(conn, category_id)  # not found?
     if not isinstance(fields, dict):
         raise RuleError("Expected a JSON object.")
-    category = _parse({k: v for k, v in fields.items() if k in FIELDS})
+    category = _parse({k: v for k, v in fields.items() if k in CHANGEABLE})
     if "name" in category:
         category["name_key"] = names.key(category["name"])
     if category:
@@ -141,7 +145,11 @@ def _duplicate_name():
 
 def _parse(fields):
     """Check the given fields; return them cleaned up."""
-    parsers = {"name": _parse_name, "emoji": _parse_emoji}
+    parsers = {
+        "name": _parse_name,
+        "emoji": _parse_emoji,
+        "shows_quantities": _parse_shows_quantities,
+    }
     return {k: parsers[k](v) for k, v in fields.items()}
 
 
@@ -157,3 +165,9 @@ def _parse_emoji(emoji):
     if not emoji:
         raise RuleError("Please give the category an emoji.")
     return emoji
+
+
+def _parse_shows_quantities(value):
+    if not isinstance(value, bool):
+        raise RuleError("shows_quantities must be true or false.")
+    return int(value)

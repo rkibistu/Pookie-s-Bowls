@@ -1,6 +1,6 @@
 // The Categories dialog on the Recipes page: every recipe category in its
-// order, to rename (name and emoji), move ↑/↓, delete, and add new ones.
-// Each change saves as soon as it's made.
+// order, to rename (name and emoji), switch whether it shows quantities (⚖️),
+// move ↑/↓, delete, and add new ones. Each change saves as soon as it's made.
 
 import { catalog } from "./catalog.js";
 import { el, showDialogError } from "./dom.js";
@@ -19,6 +19,7 @@ function renderRows() {
     row.append(
       fieldInput(category, "emoji", "category-emoji", `${category.name}'s emoji`),
       fieldInput(category, "name", "category-name", `${category.name}'s name`),
+      quantitiesButton(category),
       rowButton("↑", `Move ${category.name} up`, index === 0, () => move(index, -1)),
       rowButton("↓", `Move ${category.name} down`, index === categories.length - 1, () =>
         move(index, 1),
@@ -59,6 +60,19 @@ function rowButton(text, label, disabled, onClick) {
   btn.disabled = disabled;
   btn.setAttribute("aria-label", label);
   btn.addEventListener("click", onClick);
+  return btn;
+}
+
+/** ⚖️, faded while the category doesn't show quantities; a tap switches it. */
+function quantitiesButton(category) {
+  const on = category.shows_quantities;
+  const label = `${category.name} ${on ? "shows" : "doesn't show"} quantities`;
+  const btn = rowButton("⚖️", label, false, () =>
+    run(() => catalog.changeRecipeCategory(category.id, { shows_quantities: !on })),
+  );
+  btn.classList.add("quantities-toggle");
+  btn.classList.toggle("off", !on);
+  btn.setAttribute("aria-pressed", String(on));
   return btn;
 }
 

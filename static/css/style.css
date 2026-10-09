@@ -1031,6 +1031,67 @@ body.selecting .ingredient-row.unpickable::after {
     color: #fff;
 }
 
+/* A quantity on the right of its row: amount box, then unit. */
+/* A long name wraps rather than squeezing the quantity. */
+.recipe-ingredient .ingredient-label,
+.recipe-ingredient .sub-recipe-btn {
+    min-width: 0;
+    overflow-wrap: break-word;
+}
+
+.quantity {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+}
+
+/* Like the notes: plain text until tapped, a soft highlight on hover. */
+.recipe-ingredient input.quantity-amount,
+.recipe-ingredient select.quantity-unit {
+    width: auto;
+    height: auto;
+    padding: 2px 4px;
+    font: inherit;
+    font-size: 0.95rem;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.recipe-ingredient input.quantity-amount {
+    width: 3.5em;
+    text-align: right;
+    cursor: text;
+}
+
+.recipe-ingredient input.quantity-amount::placeholder {
+    color: var(--muted);
+}
+
+.recipe-ingredient select.quantity-unit {
+    width: 3.6em;
+    appearance: none;
+    color: var(--muted);
+}
+
+.recipe-ingredient input.quantity-amount:hover,
+.recipe-ingredient select.quantity-unit:hover {
+    background: var(--accent-soft);
+}
+
+.recipe-ingredient input.quantity-amount:focus,
+.recipe-ingredient select.quantity-unit:focus {
+    background: var(--surface);
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
 .recipe-ingredients-empty {
     color: var(--muted);
     font-style: italic;
@@ -1165,6 +1226,11 @@ body.selecting .ingredient-row.unpickable::after {
     opacity: 0.25;
     cursor: default;
     background: transparent;
+}
+
+.category-row .quantities-toggle.off {
+    opacity: 0.3;
+    filter: grayscale(1);
 }
 
 .category-row .category-delete-armed {

@@ -52,9 +52,13 @@ export function renderItemLabel(item, pop = null) {
 
 /**
  * One ingredient row. A recipe inside (e.g. a sauce) opens with onOpen on
- * tap, if given; onRemove, if given, adds a ✕.
+ * tap, if given; quantity (its amount box and unit, see quantities.js) goes
+ * on the right, if given; onRemove, if given, adds a ✕ after it.
  */
-export function renderComponentRow(component, { onOpen = null, onRemove = null } = {}) {
+export function renderComponentRow(
+  component,
+  { onOpen = null, quantity = null, onRemove = null } = {},
+) {
   const item = el("li", "recipe-ingredient");
   if (component.type === "recipe" && onOpen) {
     const open = el("button", "sub-recipe-btn");
@@ -70,6 +74,7 @@ export function renderComponentRow(component, { onOpen = null, onRemove = null }
     if (component.type === "recipe") item.append(el("span", null, SUB_RECIPE));
     item.append(renderItemLabel(component));
   }
+  if (quantity) item.append(quantity);
   if (!onRemove) return item;
 
   const remove = el("button", "recipe-ingredient-remove", "✕");

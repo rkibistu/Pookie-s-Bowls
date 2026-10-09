@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS ingredients (
     id         INTEGER PRIMARY KEY,
     name       TEXT    NOT NULL,
     name_key   TEXT    NOT NULL,  -- names.key(name)
+    last_unit  TEXT    NOT NULL DEFAULT 'g',  -- what it starts with in a recipe (recipes.py)
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -24,7 +25,9 @@ CREATE TABLE IF NOT EXISTS recipe_categories (
     name     TEXT    NOT NULL,
     name_key TEXT    NOT NULL,  -- names.key(name)
     emoji    TEXT    NOT NULL,
-    position INTEGER NOT NULL DEFAULT 0
+    position INTEGER NOT NULL DEFAULT 0,
+    -- Its recipes show quantities (at least one of a recipe's categories must).
+    shows_quantities INTEGER NOT NULL DEFAULT 1 CHECK (shows_quantities IN (0, 1))
 );
 
 -- Recipe category names are unique, ignoring case, accents and extra spaces.
@@ -82,6 +85,7 @@ CREATE TABLE IF NOT EXISTS recipes (
     name       TEXT    NOT NULL,
     url        TEXT,
     notes      TEXT,
+    last_unit  TEXT    NOT NULL DEFAULT 'g',  -- what it starts with inside another recipe
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -94,12 +98,15 @@ CREATE TABLE IF NOT EXISTS recipe_category_links (
 
 -- Contents of a recipe, in pick order. Each row references EITHER an
 -- ingredient OR another recipe (e.g. a sauce in a bowl), never both and
--- never neither.
+-- never neither, with its quantity: an amount and a unit (recipes.UNITS),
+-- kept whether or not the recipe shows quantities.
 CREATE TABLE IF NOT EXISTS recipe_components (
     id                  INTEGER PRIMARY KEY,
     recipe_id           INTEGER NOT NULL REFERENCES recipes(id)     ON DELETE CASCADE,
     ingredient_id       INTEGER          REFERENCES ingredients(id) ON DELETE CASCADE,
     component_recipe_id INTEGER          REFERENCES recipes(id)     ON DELETE CASCADE,
+    quantity            REAL    NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+    unit                TEXT    NOT NULL DEFAULT 'g',
     CHECK ((ingredient_id IS NOT NULL) + (component_recipe_id IS NOT NULL) = 1),
     CHECK (component_recipe_id IS NULL OR component_recipe_id <> recipe_id)
 );

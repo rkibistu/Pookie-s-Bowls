@@ -6,19 +6,30 @@ import { checkedChipIds, el, renderChips, showDialogError, showToast } from "./d
 import { initItemSearch } from "./item-search.js";
 import { itemKey, picksByKey, renderComponentRow } from "./items.js";
 import { pickSession } from "./pick-session.js";
+import { lastUnit, quantityControls, showsQuantities } from "./quantities.js";
 import { categoryChipOptions, defaultCategoryIds, recipeEmoji } from "./recipe-categories.js";
 
 // The new recipe being written in the build dialog: {picks}, or null. picks
-// is Map<itemKey, {type, id, name}> in pick order; its other fields live in
-// the dialog's form until it's saved or cancelled.
+// is Map<itemKey, {type, id, name, quantity, unit}> in pick order; its other
+// fields live in the dialog's form until it's saved or cancelled.
 let draft = null;
+
+/**
+ * These items as a draft's picks, in their order: one in before (the picks
+ * it had) keeps its quantity, a new one starts at 0 in its last unit.
+ */
+function draftPicks(items, before = new Map()) {
+  return picksByKey(
+    items.map((item) => before.get(itemKey(item)) ?? { ...item, quantity: 0, unit: lastUnit(item) }),
+  );
+}
 
 /**
  * Start a new recipe: empty form, with these picks, in categoryId (a
  * station's category) or else the first category.
  */
 function startDraft(picks = [], categoryId = null) {
-  draft = { picks: picksByKey(picks) };
+  draft = { picks: draftPicks(picks) };
   document.getElementById("build-form").reset();
   document.getElementById("build-add-suggestions").hidden = true;
   renderChips("build-categories", categoryChipOptions(), defaultCategoryIds(categoryId));
@@ -41,7 +52,8 @@ export function pickNewRecipe(picks = []) {
 
 /**
  * The draft's picks in the build dialog, always editable like the recipe
- * page's ingredients in edit mode: ✕ to remove, plus the add box and picker.
+ * page's ingredients in edit mode: their quantities if the ticked categories
+ * show them, ✕ to remove, plus the add box and picker.
  */
 function renderDialogPicks() {
   const list = document.getElementById("build-dialog-picks");
@@ -49,9 +61,13 @@ function renderDialogPicks() {
   if (draft.picks.size === 0) {
     list.append(el("li", "recipe-ingredients-empty", "No ingredients yet"));
   }
+  const withQuantities = showsQuantities(checkedChipIds("build-categories"));
   for (const [key, pick] of draft.picks) {
     list.append(
       renderComponentRow(pick, {
+        quantity: withQuantities
+          ? quantityControls(pick, (change) => Object.assign(pick, change))
+          : null,
         onRemove: () => {
           draft.picks.delete(key);
           renderDialogPicks();
@@ -82,7 +98,7 @@ function pickFromDialog() {
     picks: [...draft.picks.values()],
     doneLabel: "Done ✓",
     onDone: (picked) => {
-      draft.picks = picksByKey(picked);
+      draft.picks = draftPicks(picked, draft.picks);
       openBuildDialog();
     },
     onCancel: openBuildDialog,
@@ -96,7 +112,12 @@ async function saveBuilt(event) {
     url: document.getElementById("build-url").value,
     notes: document.getElementById("build-notes").value,
     category_ids: checkedChipIds("build-categories"),
-    components: [...draft.picks.values()],
+    components: [...draft.picks.values()].map(({ type, id, quantity, unit }) => ({
+      type,
+      id,
+      quantity,
+      unit,
+    })),
   };
   const save = document.getElementById("build-save");
   save.disabled = true;
@@ -122,10 +143,14 @@ export function initNewRecipe() {
     "build-add-suggestions",
     (key) => draft.picks.has(key),
     (item) => {
-      draft.picks.set(itemKey(item), item);
+      draft.picks.set(itemKey(item), { ...item, quantity: 0, unit: lastUnit(item) });
       renderDialogPicks();
     },
   );
+  // Ticking a category can show or hide the quantities.
+  document.getElementById("build-categories").addEventListener("change", () => {
+    if (draft) renderDialogPicks();
+  });
   document.getElementById("build-dialog-cancel").addEventListener("click", () => {
     document.getElementById("build-dialog").close();
     draft = null;

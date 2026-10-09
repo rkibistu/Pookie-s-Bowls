@@ -4,11 +4,17 @@ Every function takes the database connection to work on and returns plain
 dicts; a broken rule raises RuleError. Nothing here knows about HTTP.
 
 A recipe's components are items, {type: "ingredient" | "recipe", id}, in
-pick order. Any recipe can go inside another, as long as that doesn't make a
-loop (only listed recipes are offered for picking, but that's the screen's
-business).
+pick order, each with its quantity: an amount (0 until filled in) and a unit.
+Any recipe can go inside another, as long as that doesn't make a loop (only
+listed recipes are offered for picking, but that's the screen's business).
+
+Every ingredient and recipe has a last unit, the one a new row for it starts
+with: the unit of a row that's new in a saved recipe, or whose unit changed.
+A recipe shows its quantities when one of its categories does; they're kept
+either way.
 """
 
+import math
 from urllib.parse import urlsplit
 
 import favorites
@@ -16,20 +22,25 @@ from errors import NOT_FOUND, RuleError
 
 FIELDS = ("name", "url", "notes", "category_ids", "components")
 
+# The units a quantity can be in.
+UNITS = ("g", "kg", "ml", "l", "tsp", "tbsp", "cup", "pcs", "pinch")
+
 
 # ---- Reading -------------------------------------------------------------
 
 
 def get(conn, recipe_id):
-    """One recipe with its categories, components and favorites."""
+    """One recipe with its categories, components (with quantities) and favorites."""
     row = _row(conn, recipe_id)
     favorited = favorites.by_item(conn)
     components = _components(conn, recipe_id).get(recipe_id, [])
     for c in components:
         c["favorites"] = favorited.get((c["type"], c["id"]), [])
+    categories = _categories(conn, recipe_id).get(recipe_id, [])
     return {
         **dict(row),
-        "categories": _categories(conn, recipe_id).get(recipe_id, []),
+        "categories": categories,
+        "shows_quantities": _shows_quantities(categories),
         "components": components,
         "favorites": favorited.get(("recipe", recipe_id), []),
     }
@@ -43,17 +54,19 @@ def list_all(conn):
         {
             **dict(r),
             "categories": categories.get(r["id"], []),
+            "shows_quantities": _shows_quantities(categories.get(r["id"], [])),
             "components": components.get(r["id"], []),
         }
         for r in conn.execute(
-            "SELECT id, name, url, notes FROM recipes ORDER BY created_at DESC, id DESC"
+            "SELECT id, name, url, notes, last_unit FROM recipes "
+            "ORDER BY created_at DESC, id DESC"
         )
     ]
 
 
 def _row(conn, recipe_id):
     row = conn.execute(
-        "SELECT id, name, url, notes, created_at FROM recipes WHERE id = ?",
+        "SELECT id, name, url, notes, last_unit, created_at FROM recipes WHERE id = ?",
         (recipe_id,),
     ).fetchone()
     if row is None:
@@ -66,25 +79,35 @@ def _categories(conn, recipe_id=None):
     where, params = ("WHERE l.recipe_id = ?", (recipe_id,)) if recipe_id else ("", ())
     categories = {}
     for r in conn.execute(
-        "SELECT l.recipe_id, c.id, c.name, c.emoji "
+        "SELECT l.recipe_id, c.id, c.name, c.emoji, c.shows_quantities "
         "FROM recipe_category_links l "
         f"JOIN recipe_categories c ON c.id = l.category_id {where} "
         "ORDER BY c.position, c.id",
         params,
     ):
         categories.setdefault(r["recipe_id"], []).append(
-            {"id": r["id"], "name": r["name"], "emoji": r["emoji"]}
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "emoji": r["emoji"],
+                "shows_quantities": bool(r["shows_quantities"]),
+            }
         )
     return categories
 
 
+def _shows_quantities(categories):
+    return any(c["shows_quantities"] for c in categories)
+
+
 def _components(conn, recipe_id=None):
-    """Components per recipe, in pick order: {recipe id: [{type, id, name}]}."""
+    """Components per recipe, in pick order: {recipe id: [{type, id, name,
+    quantity, unit}]}."""
     where, params = ("WHERE rc.recipe_id = ?", (recipe_id,)) if recipe_id else ("", ())
     components = {}
     for r in conn.execute(
         "SELECT rc.recipe_id, rc.ingredient_id, rc.component_recipe_id, "
-        "       COALESCE(i.name, sub.name) AS name "
+        "       rc.quantity, rc.unit, COALESCE(i.name, sub.name) AS name "
         "FROM recipe_components rc "
         "LEFT JOIN ingredients i ON i.id = rc.ingredient_id "
         f"LEFT JOIN recipes sub ON sub.id = rc.component_recipe_id {where} "
@@ -95,7 +118,7 @@ def _components(conn, recipe_id=None):
             component = {"type": "ingredient", "id": r["ingredient_id"]}
         else:
             component = {"type": "recipe", "id": r["component_recipe_id"]}
-        component["name"] = r["name"]
+        component.update(name=r["name"], quantity=r["quantity"], unit=r["unit"])
         components.setdefault(r["recipe_id"], []).append(component)
     return components
 
@@ -204,23 +227,27 @@ def _parse_category_ids(conn, category_ids):
 
 
 def _parse_components(conn, components, recipe_id):
-    """Known items, deduped, in pick order: [(type, id)].
+    """Known items, deduped, in pick order: {(type, id): (quantity, unit)}.
 
+    A quantity or unit left out (None) keeps the row's, if the recipe has
+    the item already; a new row starts at 0, in the item's last unit.
     recipe_id is the recipe being changed, which must not end up inside itself.
     """
     if components is None:
-        return []
+        return {}
     invalid = RuleError("components must be a list of {type, id} items.")
     if not isinstance(components, list):
         raise invalid
-    parsed = []
+    parsed = {}
     for c in components:
         if not isinstance(c, dict) or c.get("type") not in ("ingredient", "recipe"):
             raise invalid
         if not _is_id(c.get("id")):
             raise invalid
-        parsed.append((c["type"], c["id"]))
-    parsed = list(dict.fromkeys(parsed))  # dedupe, keep order
+        # dedupe, keep the first
+        parsed.setdefault(
+            (c["type"], c["id"]), (_parse_quantity(c.get("quantity")), _parse_unit(c.get("unit")))
+        )
 
     ingredient_ids = [i for t, i in parsed if t == "ingredient"]
     if _count_known(conn, "ingredients", ingredient_ids) != len(ingredient_ids):
@@ -231,6 +258,25 @@ def _parse_components(conn, components, recipe_id):
     if recipe_id is not None and recipe_id in _inside(conn, recipe_ids):
         raise RuleError("A recipe can't go inside itself.")
     return parsed
+
+
+def _parse_quantity(quantity):
+    if quantity is None:
+        return None
+    if (
+        not isinstance(quantity, (int, float))
+        or isinstance(quantity, bool)
+        or not math.isfinite(quantity)
+        or quantity < 0
+    ):
+        raise RuleError("A quantity must be a number, 0 or more.")
+    return quantity
+
+
+def _parse_unit(unit):
+    if unit is not None and unit not in UNITS:
+        raise RuleError("Unknown unit.")
+    return unit
 
 
 def _inside(conn, recipe_ids):
@@ -270,16 +316,51 @@ def _write_categories(conn, recipe_id, category_ids):
     )
 
 
+# Where each type of item keeps its last unit.
+_ITEM_TABLES = {"ingredient": "ingredients", "recipe": "recipes"}
+
+
 def _write_components(conn, recipe_id, components):
+    """Replace the recipe's components; a row that's new, or whose unit
+    changed, makes its unit the item's last unit."""
+    before = {
+        (c["type"], c["id"]): (c["quantity"], c["unit"])
+        for c in _components(conn, recipe_id).get(recipe_id, [])
+    }
+    rows = []
+    for key, (quantity, unit) in components.items():
+        had_quantity, had_unit = before.get(key, (0, None))
+        if quantity is None:
+            quantity = had_quantity
+        if unit is None:
+            unit = had_unit or _last_unit(conn, *key)
+        rows.append((*key, quantity, unit))
     conn.execute("DELETE FROM recipe_components WHERE recipe_id = ?", (recipe_id,))
     conn.executemany(
-        "INSERT INTO recipe_components (recipe_id, ingredient_id, component_recipe_id) "
-        "VALUES (?, ?, ?)",
+        "INSERT INTO recipe_components "
+        "(recipe_id, ingredient_id, component_recipe_id, quantity, unit) VALUES (?, ?, ?, ?, ?)",
         [
-            (recipe_id, i if t == "ingredient" else None, i if t == "recipe" else None)
-            for t, i in components
+            (
+                recipe_id,
+                item_id if type_ == "ingredient" else None,
+                item_id if type_ == "recipe" else None,
+                quantity,
+                unit,
+            )
+            for type_, item_id, quantity, unit in rows
         ],
     )
+    for type_, item_id, _, unit in rows:
+        if before.get((type_, item_id), (0, None))[1] != unit:
+            conn.execute(
+                f"UPDATE {_ITEM_TABLES[type_]} SET last_unit = ? WHERE id = ?", (unit, item_id)
+            )
+
+
+def _last_unit(conn, type_, item_id):
+    return conn.execute(
+        f"SELECT last_unit FROM {_ITEM_TABLES[type_]} WHERE id = ?", (item_id,)
+    ).fetchone()[0]
 
 
 def delete(conn, recipe_id):

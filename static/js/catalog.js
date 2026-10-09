@@ -116,7 +116,7 @@ export function createCatalog({ api }) {
     changeIngredient: (id, fields) => save("PATCH", `/api/ingredients/${id}`, fields),
     deleteIngredient: (id) => save("DELETE", `/api/ingredients/${id}`),
     createRecipeCategory: (fields) => save("POST", "/api/recipe-categories", fields),
-    /** Change only the fields given (name and/or emoji). */
+    /** Change only the fields given (name, emoji, shows_quantities). */
     changeRecipeCategory: (id, fields) => save("PATCH", `/api/recipe-categories/${id}`, fields),
     /** Put every recipe category in this order: [id]. */
     reorderRecipeCategories: (ids) =>

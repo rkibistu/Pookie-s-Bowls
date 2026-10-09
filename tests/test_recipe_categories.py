@@ -32,6 +32,7 @@ def test_a_new_category_goes_at_the_end(conn):
         "id": created["id"],
         "name": "Pizza",
         "emoji": "🍕",
+        "shows_quantities": True,
     }
     assert names(conn) == ["Poke bowl", "Sauce", "Soup", "Pizza"]
 
@@ -70,7 +71,7 @@ def test_renaming_changes_only_the_fields_given_and_shows_on_its_recipes(conn, c
 
     assert (changed["name"], changed["emoji"]) == ("Soups & stews", "🥘")
     assert recipes.get(conn, stew["id"])["categories"] == [
-        {"id": category("Soup"), "name": "Soups & stews", "emoji": "🥘"}
+        {"id": category("Soup"), "name": "Soups & stews", "emoji": "🥘", "shows_quantities": True}
     ]
 
 

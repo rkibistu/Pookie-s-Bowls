@@ -21,17 +21,19 @@ FIELDS = ("name", "add_section_ids", "remove_section_ids")
 
 
 def list_all(conn):
-    """Every ingredient A→Z, orphans included, with its section ids and favorites."""
+    """Every ingredient A→Z, orphans included, with its last unit (recipes.py),
+    section ids and favorites."""
     links = _section_ids(conn)
     favorited = favorites.by_item(conn)
     return [
         {
             "id": r["id"],
             "name": r["name"],
+            "last_unit": r["last_unit"],
             "section_ids": links.get(r["id"], []),
             "favorites": favorited.get(("ingredient", r["id"]), []),
         }
-        for r in conn.execute("SELECT id, name FROM ingredients ORDER BY name_key")
+        for r in conn.execute("SELECT id, name, last_unit FROM ingredients ORDER BY name_key")
     ]
 
 
