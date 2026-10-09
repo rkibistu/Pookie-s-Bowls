@@ -7,7 +7,7 @@ A shared recipe book for two people: an ingredient catalog, recipes built from t
 ### The catalog
 
 **Ingredient**:
-A base item in the catalog, such as salmon or rice. It is never a recipe: a sauce is a recipe, even though it is shown and picked like an ingredient. Its name is unique ignoring case.
+A base item in the catalog, such as salmon or rice. It is never a recipe: a sauce is a recipe, even though it is shown and picked like an ingredient. Its name is unique ignoring case. Adding an ingredient never makes a duplicate: a name already in the catalog (ignoring case) reuses that ingredient, keeping its name. Adding only ever puts it into more sections; taking it out of one is an edit.
 _Avoid_: item (that also covers listed recipes)
 
 **Item**:
