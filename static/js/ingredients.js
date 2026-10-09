@@ -3,38 +3,20 @@
 // add/edit ingredient dialog. Its rows are where a pick session picks.
 
 import { api } from "./api.js";
+import { catalog } from "./catalog.js";
 import { checkedChipIds, el, renderChips, resetDeleteButton, showDialogError } from "./dom.js";
-import { itemKey, renderItemLabel } from "./items.js";
+import { HEARTS, itemKey, renderItemLabel } from "./items.js";
 import { pickNewRecipe } from "./new-recipe.js";
 import { pickSession } from "./pick-session.js";
 import { openRecipe } from "./recipe-dialog.js";
-import { currentIdentity, HEARTS } from "./shell.js";
+import { currentIdentity } from "./shell.js";
 
-let categories = []; // last loaded list, also used for the dialog's chips
-let recipeSections = []; // recipe categories shown in the list (e.g. sauces)
-
-// Ingredients and listed recipes are both "items": {type, id, name, favorites}.
-const asItems = (list, type) => list.map((x) => ({ ...x, type }));
-
-/** Fetch the list again and redraw it, e.g. after a recipe is saved. */
-export async function loadIngredients() {
+/** After the catalog reloads: its error, if any, then the list. */
+function catalogChanged() {
   const errorBox = document.getElementById("ingredients-error");
-  try {
-    const data = await api("GET", "/api/ingredients");
-    categories = data.categories.map((c) => ({
-      ...c,
-      ingredients: asItems(c.ingredients, "ingredient"),
-    }));
-    recipeSections = data.recipe_sections.map((s) => ({
-      ...s,
-      recipes: asItems(s.recipes, "recipe"),
-    }));
-    errorBox.hidden = true;
-    renderIngredients();
-  } catch (err) {
-    errorBox.textContent = `Couldn't load ingredients: ${err.message}`;
-    errorBox.hidden = false;
-  }
+  errorBox.textContent = catalog.loadError() || "";
+  errorBox.hidden = !catalog.loadError();
+  renderIngredients();
 }
 
 /** One card per ingredient category, then one per listed recipe category. */
@@ -44,10 +26,10 @@ export function renderIngredients() {
     `${touchOnly.matches ? "Double-tap" : "Double-click"} to ${HEARTS[currentIdentity()]}`;
   const container = document.getElementById("ingredient-sections");
   container.replaceChildren();
-  for (const category of categories) {
+  for (const category of catalog.ingredientCategories()) {
     container.append(renderCategoryCard(category.name, category.ingredients));
   }
-  for (const section of recipeSections) {
+  for (const section of catalog.listedRecipeSections()) {
     container.append(renderCategoryCard(`${section.emoji} ${section.name}`, section.recipes));
   }
 }
@@ -180,7 +162,7 @@ async function toggleFavorite(item, isFavorite) {
   try {
     await api(isFavorite ? "DELETE" : "PUT", `/api/${base}/${item.id}/favorites/${who}`);
     justFavorited = isFavorite ? null : { key: itemKey(item), person: who };
-    await loadIngredients();
+    await catalog.reload();
   } catch (err) {
     errorBox.textContent = `Couldn't update favorite: ${err.message}`;
     errorBox.hidden = false;
@@ -201,7 +183,7 @@ function openIngredientDialog(ingredient = null) {
     : "Add ingredient";
   document.getElementById("ingredient-name").value = ingredient ? ingredient.name : "";
 
-  renderChips("ingredient-categories", categories, selected);
+  renderChips("ingredient-categories", catalog.ingredientCategories(), selected);
 
   const del = document.getElementById("ingredient-delete");
   del.hidden = !ingredient;
@@ -227,7 +209,7 @@ async function saveIngredient(event) {
       await api("POST", "/api/ingredients", body);
     }
     document.getElementById("ingredient-dialog").close();
-    await loadIngredients();
+    await catalog.reload();
   } catch (err) {
     showDialogError(err.message, "ingredient-error");
   } finally {
@@ -246,23 +228,11 @@ async function deleteIngredient() {
   try {
     await api("DELETE", `/api/ingredients/${editingIngredient.id}`);
     document.getElementById("ingredient-dialog").close();
-    await loadIngredients();
+    await catalog.reload();
   } catch (err) {
     resetDeleteButton("ingredient-delete");
     showDialogError(err.message, "ingredient-error");
   }
-}
-
-/** Every item in the list, once each, A→Z: what can be searched for and picked. */
-export function catalogItems() {
-  const all = new Map();
-  for (const category of categories) {
-    for (const item of category.ingredients) all.set(itemKey(item), item);
-  }
-  for (const section of recipeSections) {
-    for (const item of section.recipes) all.set(itemKey(item), item);
-  }
-  return [...all.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function initIngredients() {
@@ -281,5 +251,5 @@ export function initIngredients() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeRowMenu();
   });
-  loadIngredients();
+  catalog.onChange(catalogChanged);
 }

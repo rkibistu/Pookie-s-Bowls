@@ -1,28 +1,22 @@
 // The Recipes view: one card per recipe, newest first, narrowed by the
 // filter panel (categories and the items a recipe contains).
 
-import { api } from "./api.js";
+import { catalog } from "./catalog.js";
 import { checkedChipIds, el, pickChip, renderChips } from "./dom.js";
 import { initItemSearch } from "./item-search.js";
 import { itemKey, itemLabel } from "./items.js";
 import { openRecipe } from "./recipe-dialog.js";
-import { categoryChipOptions, loadRecipeCategories, recipeEmoji } from "./recipe-categories.js";
+import { categoryChipOptions, recipeEmoji } from "./recipe-categories.js";
 
 const CARD_CHIPS = 6; // component chips shown on a card before "+N"
 
-let recipes = []; // last loaded list
-
-/** Fetch the recipes again and redraw the list. */
-export async function loadRecipes() {
+/** After the catalog reloads: its error, if any, the filter's chips and the list. */
+function catalogChanged() {
   const errorBox = document.getElementById("recipes-error");
-  try {
-    recipes = (await api("GET", "/api/recipes")).recipes;
-    errorBox.hidden = true;
-    renderRecipes();
-  } catch (err) {
-    errorBox.textContent = `Couldn't load recipes: ${err.message}`;
-    errorBox.hidden = false;
-  }
+  errorBox.textContent = catalog.loadError() || "";
+  errorBox.hidden = !catalog.loadError();
+  renderFilterCategories();
+  renderRecipes();
 }
 
 /** Category badges like "🥫 Sauce". */
@@ -38,6 +32,7 @@ function renderCategoryBadges(recipe) {
 function renderRecipes() {
   const container = document.getElementById("recipe-list");
   container.replaceChildren();
+  const recipes = catalog.recipes();
   const shown = recipes.filter(matchesFilter);
   renderFilterState(shown.length);
 
@@ -101,6 +96,7 @@ function renderFilterCategories() {
 
 /** Picked-item chips, the "3 of 12" count and Clear, after the list changes. */
 function renderFilterState(shownCount) {
+  const recipes = catalog.recipes();
   document.getElementById("recipe-filter").hidden = recipes.length === 0;
   const picks = document.getElementById("recipe-filter-picks");
   picks.replaceChildren();
@@ -126,7 +122,7 @@ function clearFilter() {
 }
 
 export function initRecipes() {
-  loadRecipeCategories().then(renderFilterCategories);
+  catalog.onChange(catalogChanged);
   initItemSearch(
     "recipe-filter-input",
     "recipe-filter-suggestions",

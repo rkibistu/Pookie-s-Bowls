@@ -2,13 +2,13 @@
 // new recipe dialog and the recipe dialog each add items with it.
 
 import { el } from "./dom.js";
-import { catalogItems } from "./ingredients.js";
+import { catalog } from "./catalog.js";
 import { itemKey, itemLabel } from "./items.js";
 
 const FILTER_SUGGESTIONS = 6;
 
 /**
- * Type-ahead over catalogItems(): typing shows matches under the input,
+ * Type-ahead over catalog.items(): typing shows matches under the input,
  * tapping one (or Enter for the first) calls onPick(item). Items whose key
  * excluded(key) says are already taken aren't suggested.
  */
@@ -22,7 +22,7 @@ export function initItemSearch(inputId, listId, excluded, onPick) {
     const query = input.value.trim().toLowerCase();
     list.replaceChildren();
     const matches = query
-      ? catalogItems()
+      ? catalog.items()
           .filter((item) => !excluded(itemKey(item)))
           .filter((item) => item.name.toLowerCase().includes(query))
           .slice(0, FILTER_SUGGESTIONS)

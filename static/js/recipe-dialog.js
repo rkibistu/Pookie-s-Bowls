@@ -2,6 +2,7 @@
 // saved as soon as it changes.
 
 import { api } from "./api.js";
+import { catalog } from "./catalog.js";
 import {
   checkedChipIds,
   el,
@@ -10,12 +11,10 @@ import {
   showDialogError,
   showToast,
 } from "./dom.js";
-import { loadIngredients } from "./ingredients.js";
 import { initItemSearch } from "./item-search.js";
 import { itemKey, renderComponentRow } from "./items.js";
 import { pickSession } from "./pick-session.js";
-import { categoryChipOptions, loadRecipeCategories } from "./recipe-categories.js";
-import { loadRecipes } from "./recipes.js";
+import { categoryChipOptions } from "./recipe-categories.js";
 
 let shownRecipe = null; // recipe shown in the recipe dialog
 let recipeChanged = false; // saved something since the dialog opened
@@ -196,7 +195,6 @@ async function deleteRecipe() {
 }
 
 export function initRecipeDialog() {
-  loadRecipeCategories();
   // Everything on the recipe dialog saves as soon as it changes.
   makeEditable("recipe-title", () => ({
     value: shownRecipe.name,
@@ -268,6 +266,6 @@ export function initRecipeDialog() {
     await recipeSaving;
     if (!recipeChanged) return;
     recipeChanged = false;
-    await Promise.all([loadRecipes(), loadIngredients()]);
+    await catalog.reload();
   });
 }

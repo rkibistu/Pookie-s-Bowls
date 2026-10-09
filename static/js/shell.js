@@ -2,13 +2,9 @@
 // shown. Both survive reloads in localStorage (per device).
 
 import { renderIngredients } from "./ingredients.js";
-import { loadRecipes } from "./recipes.js";
 
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
 const VIEW_KEY = "pookie-view"; // "ingredients" | "recipes"
-
-// Each person's favorite heart.
-export const HEARTS = { me: "💜", her: "💚" };
 
 /** Apply the chosen identity: drives the color theme and button state. */
 function setIdentity(who) {
@@ -33,8 +29,6 @@ export function setView(view) {
   document.querySelectorAll(".nav-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
-  // Recipes show ingredient names, which may have changed since the last load.
-  if (view === "recipes") loadRecipes();
 }
 
 /** The view being shown: "ingredients" | "recipes". */

@@ -3,7 +3,9 @@
 // and a pick session's picks are items too.
 
 import { el } from "./dom.js";
-import { HEARTS } from "./shell.js";
+
+// Each person's favorite heart.
+export const HEARTS = { me: "💜", her: "💚" };
 
 /** "ingredient:3" or "recipe:7": tells items apart across both kinds. */
 export const itemKey = (item) => `${item.type}:${item.id}`;

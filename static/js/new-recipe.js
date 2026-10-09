@@ -2,18 +2,12 @@
 // from a pick session or the dialog's own type-ahead.
 
 import { api } from "./api.js";
+import { catalog } from "./catalog.js";
 import { checkedChipIds, el, renderChips, showDialogError, showToast } from "./dom.js";
-import { loadIngredients } from "./ingredients.js";
 import { initItemSearch } from "./item-search.js";
 import { itemKey, picksByKey, renderComponentRow } from "./items.js";
 import { pickSession } from "./pick-session.js";
-import {
-  categoryChipOptions,
-  defaultCategoryIds,
-  loadRecipeCategories,
-  recipeEmoji,
-} from "./recipe-categories.js";
-import { loadRecipes } from "./recipes.js";
+import { categoryChipOptions, defaultCategoryIds, recipeEmoji } from "./recipe-categories.js";
 
 // The new recipe being written in the build dialog: {picks}, or null. picks
 // is Map<itemKey, {type, id, name}> in pick order; its other fields live in
@@ -105,8 +99,7 @@ async function saveBuilt(event) {
     const recipe = await api("POST", "/api/recipes", body);
     document.getElementById("build-dialog").close();
     draft = null;
-    // A new sauce shows up in the ingredient list too.
-    await Promise.all([loadRecipes(), loadIngredients()]);
+    await catalog.reload();
     showToast(`“${recipe.name}” saved! ${recipeEmoji(recipe)}`);
   } catch (err) {
     showDialogError(err.message, "build-error");
@@ -133,5 +126,4 @@ export function initNewRecipe() {
     document.getElementById("build-dialog").close();
     draft = null;
   });
-  loadRecipeCategories();
 }
