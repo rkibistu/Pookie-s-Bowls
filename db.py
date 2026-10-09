@@ -30,9 +30,9 @@ SEED_RECIPE_CATEGORIES = [
 ]
 
 
-def get_connection():
+def get_connection(path=None):
     """Open a connection with foreign keys on and row access by column name."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(path or DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
@@ -53,24 +53,29 @@ def close_db(exc=None):
 
 
 def init_db():
-    """Create the schema (if needed) and seed the fixed categories."""
+    """Create the database file's schema (if needed) and seed the fixed categories."""
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = get_connection()
     try:
-        conn.executescript(SCHEMA_PATH.read_text())
-        for position, (slug, name) in enumerate(SEED_CATEGORIES):
-            conn.execute(
-                "INSERT OR IGNORE INTO categories (slug, name, position) "
-                "VALUES (?, ?, ?)",
-                (slug, name, position),
-            )
-        for position, (slug, name, emoji, listed) in enumerate(SEED_RECIPE_CATEGORIES):
-            conn.execute(
-                "INSERT OR IGNORE INTO recipe_categories "
-                "(slug, name, emoji, position, in_ingredient_list) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (slug, name, emoji, position, listed),
-            )
-        conn.commit()
+        set_up(conn)
     finally:
         conn.close()
+
+
+def set_up(conn):
+    """Create the schema (if needed) on conn and seed the fixed categories."""
+    conn.executescript(SCHEMA_PATH.read_text())
+    for position, (slug, name) in enumerate(SEED_CATEGORIES):
+        conn.execute(
+            "INSERT OR IGNORE INTO categories (slug, name, position) "
+            "VALUES (?, ?, ?)",
+            (slug, name, position),
+        )
+    for position, (slug, name, emoji, listed) in enumerate(SEED_RECIPE_CATEGORIES):
+        conn.execute(
+            "INSERT OR IGNORE INTO recipe_categories "
+            "(slug, name, emoji, position, in_ingredient_list) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (slug, name, emoji, position, listed),
+        )
+    conn.commit()

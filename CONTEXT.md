@@ -6,6 +6,10 @@ A shared recipe book for two people: an ingredient catalog, recipes built from t
 
 ### Building recipes
 
+**Listed recipe**:
+A recipe in a category shown on the Ingredients page (e.g. a sauce), which is why it can be picked into other recipes. Being listed only decides what is shown and offered: a recipe already inside another stays there if it stops being listed.
+_Avoid_: sub-recipe category, pickable recipe
+
 **Pick**:
 An ingredient or listed recipe (e.g. a sauce) chosen to go into a recipe while picking.
 _Avoid_: selection, choice

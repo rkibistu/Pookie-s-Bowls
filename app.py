@@ -2,11 +2,11 @@
 
 import os
 import sqlite3
-from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, render_template, request
 
 import db
+import recipes
 
 app = Flask(__name__)
 app.teardown_appcontext(db.close_db)
@@ -122,7 +122,7 @@ def list_ingredients():
     ):
         links.setdefault(r["ingredient_id"], []).append(r["category_id"])
 
-    favorites = _favorites_by(conn, "ingredient_id")
+    favorites = recipes.favorites_by(conn, "ingredient_id")
 
     by_category = {c["id"]: c for c in categories}
     for r in conn.execute(
@@ -147,7 +147,7 @@ def list_ingredients():
         )
     ]
     by_section = {s["id"]: s for s in recipe_sections}
-    recipe_favorites = _favorites_by(conn, "recipe_id")
+    recipe_favorites = recipes.favorites_by(conn, "recipe_id")
     for r in conn.execute(
         "SELECT l.category_id, r.id, r.name FROM recipe_category_links l "
         "JOIN recipes r ON r.id = l.recipe_id "
@@ -214,17 +214,6 @@ def _check_person(person):
         raise ApiError("person must be 'me' or 'her'.")
 
 
-def _favorites_by(conn, column):
-    """Who has favorited each item, "me" before "her": {item id: [person]}."""
-    favorites = {}
-    for r in conn.execute(
-        f"SELECT {column} AS item_id, person FROM favorites "
-        f"WHERE {column} IS NOT NULL ORDER BY person DESC"
-    ):
-        favorites.setdefault(r["item_id"], []).append(r["person"])
-    return favorites
-
-
 def _set_favorite(column, item_id, person, on):
     """Add or remove one person's favorite on an ingredient or recipe."""
     _check_person(person)
@@ -257,254 +246,24 @@ def remove_favorite(ingredient_id, person):
 
 @app.put("/api/recipes/<int:recipe_id>/favorites/<person>")
 def add_recipe_favorite(recipe_id, person):
-    _get_recipe_row(db.get_db(), recipe_id)  # 404 if missing
+    recipes.get(db.get_db(), recipe_id)  # 404 if missing
     return _set_favorite("recipe_id", recipe_id, person, True)
 
 
 @app.delete("/api/recipes/<int:recipe_id>/favorites/<person>")
 def remove_recipe_favorite(recipe_id, person):
-    _get_recipe_row(db.get_db(), recipe_id)  # 404 if missing
+    recipes.get(db.get_db(), recipe_id)  # 404 if missing
     return _set_favorite("recipe_id", recipe_id, person, False)
 
 
 # ---- Recipes -------------------------------------------------------------
 
-def _is_id(value):
-    return isinstance(value, int) and not isinstance(value, bool)
+# The rules live in recipes.py; these routes only speak HTTP.
 
-
-def _parse_name(payload, what):
-    name = payload.get("name")
-    name = name.strip() if isinstance(name, str) else ""
-    if not name:
-        raise ApiError(f"Please give the {what} a name.")
-    return name
-
-
-def _parse_notes(payload):
-    """Optional notes; blank becomes None."""
-    notes = payload.get("notes")
-    if notes is not None and not isinstance(notes, str):
-        raise ApiError("notes must be text.")
-    return (notes or "").strip() or None
-
-
-def _parse_recipe_category_ids(payload):
-    """Validate category_ids against recipe_categories; return them sorted, unique."""
-    category_ids = payload.get("category_ids")
-    if not isinstance(category_ids, list) or not all(map(_is_id, category_ids)):
-        raise ApiError("category_ids must be a list of category ids.")
-    category_ids = sorted(set(category_ids))
-    if not category_ids:
-        raise ApiError("Pick at least one category.")
-
-    placeholders = ",".join("?" * len(category_ids))
-    found = db.get_db().execute(
-        f"SELECT COUNT(*) FROM recipe_categories WHERE id IN ({placeholders})",
-        category_ids,
-    ).fetchone()[0]
-    if found != len(category_ids):
-        raise ApiError("Unknown category.")
-    return category_ids
-
-
-def _parse_components(payload, recipe_id=None):
-    """Validate optional components; return [("ingredient_id"|"recipe_id", id)] in pick order.
-
-    recipe_id is the recipe being edited, which must not end up inside itself.
-    """
-    components = payload.get("components") or []
-    invalid = ApiError(
-        "components must be a list of {ingredient_id} or {recipe_id} objects."
-    )
-    if not isinstance(components, list):
-        raise invalid
-    parsed = []
-    for component in components:
-        if not isinstance(component, dict) or len(component) != 1:
-            raise invalid
-        ((key, value),) = component.items()
-        if key not in ("ingredient_id", "recipe_id") or not _is_id(value):
-            raise invalid
-        parsed.append((key, value))
-    parsed = list(dict.fromkeys(parsed))  # dedupe, keep order
-
-    conn = db.get_db()
-    ingredient_ids = [v for k, v in parsed if k == "ingredient_id"]
-    if ingredient_ids:
-        placeholders = ",".join("?" * len(ingredient_ids))
-        found = conn.execute(
-            f"SELECT COUNT(*) FROM ingredients WHERE id IN ({placeholders})",
-            ingredient_ids,
-        ).fetchone()[0]
-        if found != len(ingredient_ids):
-            raise ApiError("Unknown ingredient.")
-
-    recipe_ids = [v for k, v in parsed if k == "recipe_id"]
-    if recipe_ids:
-        if recipe_id in recipe_ids:
-            raise ApiError("A recipe can't contain itself.")
-        placeholders = ",".join("?" * len(recipe_ids))
-        # Only recipes shown in the ingredient list (e.g. sauces) can be picked.
-        found = conn.execute(
-            "SELECT COUNT(DISTINCT l.recipe_id) FROM recipe_category_links l "
-            "JOIN recipe_categories c ON c.id = l.category_id "
-            f"WHERE c.in_ingredient_list = 1 AND l.recipe_id IN ({placeholders})",
-            recipe_ids,
-        ).fetchone()[0]
-        if found != len(recipe_ids):
-            raise ApiError("Unknown recipe, or one that can't go into other recipes.")
-        if recipe_id is not None:
-            # Walk down through every picked recipe's own components; reaching
-            # the recipe being edited would make a loop.
-            loop = conn.execute(
-                "WITH RECURSIVE inside(id) AS ("
-                f"  SELECT id FROM recipes WHERE id IN ({placeholders})"
-                "  UNION"
-                "  SELECT rc.component_recipe_id FROM recipe_components rc"
-                "  JOIN inside ON rc.recipe_id = inside.id"
-                "  WHERE rc.component_recipe_id IS NOT NULL"
-                ") SELECT 1 FROM inside WHERE id = ?",
-                [*recipe_ids, recipe_id],
-            ).fetchone()
-            if loop:
-                raise ApiError("That would put the recipe inside itself.")
-
-    return parsed
-
-
-def _parse_url(payload):
-    """Validate the optional recipe link; return it as http(s), or None if blank."""
-    url = payload.get("url")
-    if url is not None and not isinstance(url, str):
-        raise ApiError("url must be text.")
-    url = (url or "").strip()
-    if not url:
-        return None
-    if url and "://" not in url:
-        url = "https://" + url  # "example.com/poke" → https://example.com/poke
-    # Only http(s) is accepted, so the URL is always safe to use as an href.
-    invalid = ApiError("Please enter a valid link (http/https).")
-    if any(c.isspace() for c in url):
-        raise invalid
-    try:
-        parts = urlsplit(url)
-        parts.port  # raises ValueError on a malformed port
-    except ValueError:
-        raise invalid
-    if parts.scheme.lower() not in ("http", "https") or not parts.hostname:
-        raise invalid
-    return url
-
-
-def _parse_recipe(payload, recipe_id=None):
-    """Validate a recipe body; return its fields as a dict.
-
-    The link and the components are both optional.
-    """
-    return {
-        "name": _parse_name(payload, "recipe"),
-        "notes": _parse_notes(payload),
-        "category_ids": _parse_recipe_category_ids(payload),
-        "url": _parse_url(payload),
-        "components": _parse_components(payload, recipe_id),
-    }
-
-
-def _save_recipe_parts(conn, recipe_id, recipe):
-    """Replace a recipe's category links and components."""
-    conn.execute("DELETE FROM recipe_category_links WHERE recipe_id = ?", (recipe_id,))
-    conn.executemany(
-        "INSERT INTO recipe_category_links (recipe_id, category_id) VALUES (?, ?)",
-        [(recipe_id, c) for c in recipe["category_ids"]],
-    )
-    conn.execute("DELETE FROM recipe_components WHERE recipe_id = ?", (recipe_id,))
-    conn.executemany(
-        "INSERT INTO recipe_components (recipe_id, ingredient_id, component_recipe_id) "
-        "VALUES (?, ?, ?)",
-        [
-            (recipe_id, v if k == "ingredient_id" else None, v if k == "recipe_id" else None)
-            for k, v in recipe["components"]
-        ],
-    )
-
-
-def _write_recipe(conn, recipe_id, recipe):
-    """Save a parsed recipe over an existing one."""
-    with conn:
-        conn.execute(
-            "UPDATE recipes SET name = ?, url = ?, notes = ? WHERE id = ?",
-            (recipe["name"], recipe["url"], recipe["notes"], recipe_id),
-        )
-        _save_recipe_parts(conn, recipe_id, recipe)
-
-
-def _recipe_categories(conn, recipe_id=None):
-    """Categories per recipe, in display order: {recipe id: [category]}."""
-    where, params = ("WHERE l.recipe_id = ?", (recipe_id,)) if recipe_id else ("", ())
-    categories = {}
-    for r in conn.execute(
-        "SELECT l.recipe_id, c.id, c.slug, c.name, c.emoji "
-        "FROM recipe_category_links l "
-        f"JOIN recipe_categories c ON c.id = l.category_id {where} "
-        "ORDER BY c.position, c.id",
-        params,
-    ):
-        categories.setdefault(r["recipe_id"], []).append(
-            {"id": r["id"], "slug": r["slug"], "name": r["name"], "emoji": r["emoji"]}
-        )
-    return categories
-
-
-def _recipe_components(conn, recipe_id=None):
-    """Components per recipe, in pick order: {recipe id: [{type, id, name}]}."""
-    where, params = ("WHERE rc.recipe_id = ?", (recipe_id,)) if recipe_id else ("", ())
-    components = {}
-    for r in conn.execute(
-        "SELECT rc.recipe_id, rc.ingredient_id, rc.component_recipe_id, "
-        "       COALESCE(i.name, sub.name) AS name "
-        "FROM recipe_components rc "
-        "LEFT JOIN ingredients i ON i.id = rc.ingredient_id "
-        f"LEFT JOIN recipes sub ON sub.id = rc.component_recipe_id {where} "
-        "ORDER BY rc.id",
-        params,
-    ):
-        if r["ingredient_id"] is not None:
-            component = {"type": "ingredient", "id": r["ingredient_id"]}
-        else:
-            component = {"type": "recipe", "id": r["component_recipe_id"]}
-        component["name"] = r["name"]
-        components.setdefault(r["recipe_id"], []).append(component)
-    return components
-
-
-def _get_recipe_row(conn, recipe_id):
-    """Return a recipe's own row, or raise 404."""
-    row = conn.execute(
-        "SELECT id, name, url, notes, created_at FROM recipes WHERE id = ?",
-        (recipe_id,),
-    ).fetchone()
-    if row is None:
-        raise ApiError("Recipe not found.", 404)
-    return row
-
-
-def _get_recipe(conn, recipe_id):
-    """Return one recipe with its categories and components (with hearts)."""
-    row = _get_recipe_row(conn, recipe_id)
-    favorites = {
-        "ingredient": _favorites_by(conn, "ingredient_id"),
-        "recipe": _favorites_by(conn, "recipe_id"),
-    }
-    components = _recipe_components(conn, recipe_id).get(recipe_id, [])
-    for c in components:
-        c["favorites"] = favorites[c["type"]].get(c["id"], [])
-    return {
-        **dict(row),
-        "categories": _recipe_categories(conn, recipe_id).get(recipe_id, []),
-        "components": components,
-        "favorites": favorites["recipe"].get(recipe_id, []),
-    }
+@app.errorhandler(recipes.RecipeError)
+def handle_recipe_error(err):
+    status = 404 if err.kind == recipes.NOT_FOUND else 400
+    return jsonify(error=err.message), status
 
 
 @app.get("/api/recipe-categories")
@@ -523,91 +282,28 @@ def list_recipe_categories():
 
 @app.get("/api/recipes")
 def list_recipes():
-    """All recipes, newest first, each with its categories and components."""
-    conn = db.get_db()
-    categories = _recipe_categories(conn)
-    components = _recipe_components(conn)
-    recipes = [
-        {
-            **dict(r),
-            "categories": categories.get(r["id"], []),
-            "components": components.get(r["id"], []),
-        }
-        for r in conn.execute(
-            "SELECT id, name, url, notes FROM recipes "
-            "ORDER BY created_at DESC, id DESC"
-        )
-    ]
-    return jsonify(recipes=recipes)
+    return jsonify(recipes=recipes.list_all(db.get_db()))
 
 
 @app.get("/api/recipes/<int:recipe_id>")
 def get_recipe(recipe_id):
-    return jsonify(_get_recipe(db.get_db(), recipe_id))
+    return jsonify(recipes.get(db.get_db(), recipe_id))
 
 
 @app.post("/api/recipes")
 def create_recipe():
-    payload = request.get_json(silent=True)
-    if not isinstance(payload, dict):
-        raise ApiError("Expected a JSON object.")
-    recipe = _parse_recipe(payload)
-
-    conn = db.get_db()
-    with conn:
-        cur = conn.execute(
-            "INSERT INTO recipes (name, url, notes) VALUES (?, ?, ?)",
-            (recipe["name"], recipe["url"], recipe["notes"]),
-        )
-        _save_recipe_parts(conn, cur.lastrowid, recipe)
-    return jsonify(_get_recipe(conn, cur.lastrowid)), 201
-
-
-@app.put("/api/recipes/<int:recipe_id>")
-def update_recipe(recipe_id):
-    """Replace a recipe's fields."""
-    conn = db.get_db()
-    _get_recipe_row(conn, recipe_id)  # 404 if missing
-    payload = request.get_json(silent=True)
-    if not isinstance(payload, dict):
-        raise ApiError("Expected a JSON object.")
-    recipe = _parse_recipe(payload, recipe_id)
-    _write_recipe(conn, recipe_id, recipe)
-    return jsonify(_get_recipe(conn, recipe_id))
+    return jsonify(recipes.create(db.get_db(), request.get_json(silent=True))), 201
 
 
 @app.patch("/api/recipes/<int:recipe_id>")
-def patch_recipe(recipe_id):
+def change_recipe(recipe_id):
     """Change only the fields sent (e.g. just notes); the rest stays as stored."""
-    conn = db.get_db()
-    current = _get_recipe(conn, recipe_id)  # 404 if missing
-    payload = request.get_json(silent=True)
-    if not isinstance(payload, dict):
-        raise ApiError("Expected a JSON object.")
-    merged = {
-        "name": current["name"],
-        "notes": current["notes"],
-        "url": current["url"],
-        "category_ids": [c["id"] for c in current["categories"]],
-        "components": [
-            {"recipe_id" if c["type"] == "recipe" else "ingredient_id": c["id"]}
-            for c in current["components"]
-        ],
-    }
-    merged.update((k, v) for k, v in payload.items() if k in merged)
-    recipe = _parse_recipe(merged, recipe_id)
-    _write_recipe(conn, recipe_id, recipe)
-    return jsonify(_get_recipe(conn, recipe_id))
+    return jsonify(recipes.change(db.get_db(), recipe_id, request.get_json(silent=True)))
 
 
 @app.delete("/api/recipes/<int:recipe_id>")
 def delete_recipe(recipe_id):
-    """Delete a recipe; it also disappears from any recipe that contained it."""
-    conn = db.get_db()
-    with conn:
-        cur = conn.execute("DELETE FROM recipes WHERE id = ?", (recipe_id,))
-    if cur.rowcount == 0:
-        raise ApiError("Recipe not found.", 404)
+    recipes.delete(db.get_db(), recipe_id)
     return "", 204
 
 

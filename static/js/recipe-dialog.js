@@ -12,7 +12,7 @@ import {
 } from "./dom.js";
 import { loadIngredients } from "./ingredients.js";
 import { initItemSearch } from "./item-search.js";
-import { componentsBody, itemKey, renderComponentRow } from "./items.js";
+import { itemKey, renderComponentRow } from "./items.js";
 import { pickSession } from "./pick-session.js";
 import { categoryChipOptions, loadRecipeCategories } from "./recipe-categories.js";
 import { loadRecipes } from "./recipes.js";
@@ -88,7 +88,7 @@ function renderRecipeComponent(component) {
     onRemove: editingIngredients
       ? () =>
           saveRecipePatch({
-            components: componentsBody(shownRecipe.components.filter((c) => itemKey(c) !== key)),
+            components: shownRecipe.components.filter((c) => itemKey(c) !== key),
           })
       : null,
   });
@@ -235,7 +235,7 @@ export function initRecipeDialog() {
     // Already in it, or the recipe itself.
     (key) =>
       key === `recipe:${shownRecipe.id}` || shownRecipe.components.some((c) => itemKey(c) === key),
-    (item) => saveRecipePatch({ components: componentsBody([...shownRecipe.components, item]) }),
+    (item) => saveRecipePatch({ components: [...shownRecipe.components, item] }),
   );
   document.getElementById("recipe-pick").addEventListener("click", () => {
     const recipe = shownRecipe;
@@ -248,7 +248,7 @@ export function initRecipeDialog() {
       doneLabel: "Done ✓",
       onDone: async (picked) => {
         try {
-          await api("PATCH", `/api/recipes/${recipe.id}`, { components: componentsBody(picked) });
+          await api("PATCH", `/api/recipes/${recipe.id}`, { components: picked });
         } catch (err) {
           showToast(`Couldn't save: ${err.message}`);
           throw err;

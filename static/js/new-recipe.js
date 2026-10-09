@@ -5,7 +5,7 @@ import { api } from "./api.js";
 import { checkedChipIds, el, renderChips, showDialogError, showToast } from "./dom.js";
 import { loadIngredients } from "./ingredients.js";
 import { initItemSearch } from "./item-search.js";
-import { componentsBody, itemKey, picksByKey, renderComponentRow } from "./items.js";
+import { itemKey, picksByKey, renderComponentRow } from "./items.js";
 import { pickSession } from "./pick-session.js";
 import {
   categoryChipOptions,
@@ -97,7 +97,7 @@ async function saveBuilt(event) {
     url: document.getElementById("build-url").value,
     notes: document.getElementById("build-notes").value,
     category_ids: checkedChipIds("build-categories"),
-    components: componentsBody(draft.picks.values()),
+    components: [...draft.picks.values()],
   };
   const save = document.getElementById("build-save");
   save.disabled = true;

@@ -13,10 +13,6 @@ export const itemLabel = (item) => (item.type === "recipe" ? `${SUB_RECIPE} ${it
 
 const SUB_RECIPE = "📖"; // marks a recipe used inside another recipe
 
-/** Picks or components as the API's [{ingredient_id} | {recipe_id}]. */
-export const componentsBody = (items) =>
-  [...items].map((x) => (x.type === "recipe" ? { recipe_id: x.id } : { ingredient_id: x.id }));
-
 /** Picks as a Map<itemKey, pick>, the way the draft keeps them. */
 export const picksByKey = (picks) => new Map(picks.map((p) => [itemKey(p), p]));
 
