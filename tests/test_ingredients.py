@@ -28,7 +28,7 @@ def test_an_ingredient_in_two_sections_shows_up_under_both_a_to_z(conn, section)
 def test_an_ingredient_can_be_in_no_section_and_is_still_in_the_catalog(conn, section):
     ingredients.add(conn, {"name": "Seaweed"})
     tofu = ingredients.add(conn, {"name": "Tofu", "section_ids": [section("Protein")]})["ingredient"]
-    ingredients.change(conn, tofu["id"], {"section_ids": []})
+    ingredients.change(conn, tofu["id"], {"remove_section_ids": [section("Protein")]})
 
     assert all(names == [] for names in names_by_section(conn).values())
     assert [(i["name"], i["section_ids"]) for i in ingredients.list_all(conn)] == [
@@ -179,6 +179,88 @@ def test_changing_only_the_name_keeps_the_sections(conn, section):
         "name": "Smoked tofu",
         "section_ids": sorted([section("Protein"), section("Topping")]),
     }
+
+
+# ---- Editing changes only what was changed --------------------------------
+
+
+@pytest.fixture
+def mango_on_two_stations(conn, section):
+    """Mango in Poke → Fresh and Burger → Toppings: (mango id, toppings id)."""
+    burger = stations.create(conn, {"name": "Burger", "emoji": "🍔"})["id"]
+    toppings = stations.add_section(conn, burger, {"name": "Toppings"})["id"]
+    fresh = section("Fresh Vegetables / Fruits")
+    mango = ingredients.add(conn, {"name": "Mango", "section_ids": [fresh, toppings]})
+    return mango["ingredient"]["id"], toppings
+
+
+def test_ticking_a_section_keeps_the_ones_it_was_in(conn, section, mango_on_two_stations):
+    mango, toppings = mango_on_two_stations
+
+    changed = ingredients.change(conn, mango, {"add_section_ids": [section("Extras")]})
+
+    assert changed["section_ids"] == sorted(
+        [section("Fresh Vegetables / Fruits"), toppings, section("Extras")]
+    )
+
+
+def test_unticking_a_section_takes_it_out_of_only_that_one(conn, section, mango_on_two_stations):
+    mango, toppings = mango_on_two_stations
+
+    changed = ingredients.change(
+        conn, mango, {"remove_section_ids": [section("Fresh Vegetables / Fruits")]}
+    )
+
+    assert changed["section_ids"] == [toppings]
+
+
+def test_ticking_an_unknown_section_changes_nothing(conn, section, mango_on_two_stations):
+    mango, toppings = mango_on_two_stations
+    before = ingredients.get(conn, mango)
+    sauce = next(s for s in stations.list_all(conn)[0]["sections"] if s["kind"] == "recipes")
+
+    for unknown in (999, sauce["id"]):
+        with pytest.raises(RuleError) as err:
+            ingredients.change(
+                conn,
+                mango,
+                {"name": "Ripe mango", "add_section_ids": [section("Extras"), unknown]},
+            )
+        assert (err.value.kind, err.value.message) == (INVALID, "Unknown section.")
+
+    assert ingredients.get(conn, mango) == before
+
+
+def test_unticking_a_section_it_is_not_in_is_fine(conn, section, mango_on_two_stations):
+    mango, toppings = mango_on_two_stations
+
+    changed = ingredients.change(conn, mango, {"remove_section_ids": [section("Base"), 999]})
+
+    assert changed["section_ids"] == sorted([section("Fresh Vegetables / Fruits"), toppings])
+
+
+def test_a_section_cannot_be_both_ticked_and_unticked(conn, section, mango_on_two_stations):
+    mango, _ = mango_on_two_stations
+
+    with pytest.raises(RuleError) as err:
+        ingredients.change(
+            conn, mango, {"add_section_ids": [section("Base")], "remove_section_ids": [section("Base")]}
+        )
+
+    assert (err.value.kind, err.value.message) == (
+        INVALID,
+        "A section can't be both added and removed.",
+    )
+
+
+@pytest.mark.parametrize("field", ["add_section_ids", "remove_section_ids"])
+def test_section_changes_must_be_lists_of_ids(conn, ingredient, field):
+    tofu = ingredient("Tofu")
+
+    with pytest.raises(RuleError) as err:
+        ingredients.change(conn, tofu, {field: ["1"]})
+
+    assert (err.value.kind, err.value.message) == (INVALID, f"{field} must be a list of section ids.")
 
 
 def test_deleting_an_ingredient_takes_it_out_of_the_recipes_that_had_it(conn, category, ingredient):

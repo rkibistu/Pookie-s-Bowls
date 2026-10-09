@@ -109,7 +109,10 @@ export function createCatalog({ api }) {
      * puts it into more sections. Resolves to {ingredient, reused, added_to}.
      */
     addIngredient: (fields) => save("POST", "/api/ingredients", fields),
-    /** Change only the fields given; resolves to the saved ingredient. */
+    /**
+     * {name?, add_section_ids?, remove_section_ids?}: sections not mentioned
+     * stay as stored. Resolves to the saved ingredient.
+     */
     changeIngredient: (id, fields) => save("PATCH", `/api/ingredients/${id}`, fields),
     deleteIngredient: (id) => save("DELETE", `/api/ingredients/${id}`),
     createRecipeCategory: (fields) => save("POST", "/api/recipe-categories", fields),

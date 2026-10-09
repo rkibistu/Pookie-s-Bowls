@@ -13,7 +13,7 @@ import sqlite3
 import favorites
 from errors import DUPLICATE, NOT_FOUND, RuleError
 
-FIELDS = ("name", "section_ids")
+FIELDS = ("name", "add_section_ids", "remove_section_ids")
 
 
 # ---- Reading -------------------------------------------------------------
@@ -97,11 +97,19 @@ def add(conn, fields):
 
 
 def change(conn, ingredient_id, fields):
-    """Change only the fields given; the rest stays as stored."""
+    """Change only what's given: name, add_section_ids, remove_section_ids.
+
+    Sections not mentioned stay as stored, so a change made meanwhile on the
+    other phone survives. Removing it from a section it isn't in is fine.
+    """
     get(conn, ingredient_id)  # not found?
     if not isinstance(fields, dict):
         raise RuleError("Expected a JSON object.")
     ingredient = _parse(conn, {k: v for k, v in fields.items() if k in FIELDS})
+    added = ingredient.get("add_section_ids", [])
+    removed = ingredient.get("remove_section_ids", [])
+    if set(added) & set(removed):
+        raise RuleError("A section can't be both added and removed.")
     try:
         with conn:
             if "name" in ingredient:
@@ -109,8 +117,15 @@ def change(conn, ingredient_id, fields):
                     "UPDATE ingredients SET name = ? WHERE id = ?",
                     (ingredient["name"], ingredient_id),
                 )
-            if "section_ids" in ingredient:
-                _write_sections(conn, ingredient_id, ingredient["section_ids"])
+            conn.executemany(
+                "INSERT OR IGNORE INTO section_ingredients (section_id, ingredient_id) "
+                "VALUES (?, ?)",
+                [(s, ingredient_id) for s in added],
+            )
+            conn.executemany(
+                "DELETE FROM section_ingredients WHERE section_id = ? AND ingredient_id = ?",
+                [(s, ingredient_id) for s in removed],
+            )
     except sqlite3.IntegrityError:
         raise _duplicate_name()
     return get(conn, ingredient_id)
@@ -133,7 +148,9 @@ def _parse(conn, fields):
     """Check the given fields; return them cleaned up."""
     parsers = {
         "name": _parse_name,
-        "section_ids": lambda v: _parse_section_ids(conn, v),
+        "section_ids": lambda v: _parse_known_sections(conn, "section_ids", v),
+        "add_section_ids": lambda v: _parse_known_sections(conn, "add_section_ids", v),
+        "remove_section_ids": lambda v: _parse_ids("remove_section_ids", v),
     }
     return {k: parsers[k](v) for k, v in fields.items()}
 
@@ -145,13 +162,18 @@ def _parse_name(name):
     return name
 
 
-def _parse_section_ids(conn, section_ids):
-    """Known ingredient section ids, sorted and unique; may be empty."""
-    if not isinstance(section_ids, list) or not all(
-        isinstance(c, int) and not isinstance(c, bool) for c in section_ids
+def _parse_ids(field, ids):
+    """Section ids, sorted and unique; may be empty."""
+    if not isinstance(ids, list) or not all(
+        isinstance(c, int) and not isinstance(c, bool) for c in ids
     ):
-        raise RuleError("section_ids must be a list of section ids.")
-    section_ids = sorted(set(section_ids))
+        raise RuleError(f"{field} must be a list of section ids.")
+    return sorted(set(ids))
+
+
+def _parse_known_sections(conn, field, section_ids):
+    """Known ingredient section ids, sorted and unique; may be empty."""
+    section_ids = _parse_ids(field, section_ids)
     if not section_ids:
         return []
     placeholders = ",".join("?" * len(section_ids))
@@ -162,11 +184,3 @@ def _parse_section_ids(conn, section_ids):
     if found != len(section_ids):
         raise RuleError("Unknown section.")
     return section_ids
-
-
-def _write_sections(conn, ingredient_id, section_ids):
-    conn.execute("DELETE FROM section_ingredients WHERE ingredient_id = ?", (ingredient_id,))
-    conn.executemany(
-        "INSERT INTO section_ingredients (section_id, ingredient_id) VALUES (?, ?)",
-        [(s, ingredient_id) for s in section_ids],
-    )

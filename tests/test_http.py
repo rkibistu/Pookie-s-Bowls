@@ -53,6 +53,11 @@ def test_an_ingredient_can_be_changed_and_its_errors_come_back_as_json(client):
     changed = client.patch(f"/api/ingredients/{tofu['id']}", json={"name": "Smoked tofu"})
     assert (changed.status_code, changed.json["section_ids"]) == (200, [1])
 
+    moved = client.patch(
+        f"/api/ingredients/{tofu['id']}", json={"add_section_ids": [2], "remove_section_ids": [1]}
+    )
+    assert (moved.status_code, moved.json["section_ids"]) == (200, [2])
+
     taken = client.patch(f"/api/ingredients/{rice['id']}", json={"name": "smoked TOFU"})
     assert (taken.status_code, taken.json) == (
         409,

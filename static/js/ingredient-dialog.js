@@ -159,7 +159,15 @@ function sectionLabel(id) {
 async function save() {
   const name = nameInput().value;
   if (editing) {
-    await catalog.changeIngredient(editing.id, { name, section_ids: tickedSectionIds() });
+    // Only what was changed here, so a change from the other phone survives.
+    const before = new Set(editing.section_ids ?? []);
+    const after = new Set(tickedSectionIds());
+    const fields = {
+      add_section_ids: [...after].filter((id) => !before.has(id)),
+      remove_section_ids: [...before].filter((id) => !after.has(id)),
+    };
+    if (name.trim() !== editing.name) fields.name = name;
+    await catalog.changeIngredient(editing.id, fields);
     return;
   }
   const sectionIds = adding.section ? [adding.section.id] : tickedSectionIds({ newOnly: true });
