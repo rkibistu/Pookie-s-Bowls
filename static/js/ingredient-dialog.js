@@ -77,18 +77,20 @@ function show({ title, name, chipStations, selected, folded }) {
 
 /**
  * One group of chips per station: the ingredient sections it's in. None
- * ticked is fine. Each group folds open and shut; folded, it starts shut
- * unless something in it is ticked. Its title counts what's ticked.
+ * ticked is fine. With several groups each folds open and shut; folded, it
+ * starts shut unless something in it is ticked. A group on its own doesn't
+ * fold. Its title counts what's ticked.
  * already: sections it's in already, shown ticked and greyed out (adding
  * can't take it out of them).
  */
 function renderSectionChips(selected, already = new Set()) {
   const box = document.getElementById("ingredient-section-chips");
   box.replaceChildren();
+  const folds = chipView.stations.length > 1;
   for (const station of chipView.stations) {
     const sections = ingredientSections(station);
-    const group = el("details", "chip-group");
-    const title = el("summary", "chip-group-title");
+    const group = el(folds ? "details" : "div", "chip-group");
+    const title = el(folds ? "summary" : "p", "chip-group-title");
     const chips = el("div", "chips");
     chips.id = `ingredient-station-${station.id}`;
     group.append(title, chips);
@@ -108,7 +110,7 @@ function renderSectionChips(selected, already = new Set()) {
       return ticked;
     };
     chips.addEventListener("change", countTicked);
-    group.open = !chipView.folded || countTicked() > 0;
+    if (folds) group.open = !chipView.folded || countTicked() > 0;
     countTicked();
   }
 }
