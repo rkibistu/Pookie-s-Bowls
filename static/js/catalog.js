@@ -1,7 +1,7 @@
 // The catalog: everything the server knows that the views show (ingredients,
-// recipes, recipe categories), loaded in full and kept in one place. Views
-// read from it and redraw when onChange tells them to; they never fetch these
-// lists themselves.
+// recipes, recipe categories), loaded in full and kept in one place, and every
+// change to it. Views read from it and redraw when onChange tells them to;
+// they never call the server for these themselves.
 
 import { api as realApi } from "./api.js";
 import { itemKey } from "./items.js";
@@ -16,7 +16,7 @@ export function createCatalog({ api }) {
   let recipeCategories = []; // fixed on the server, loaded once
   let loadError = null; // what went wrong with the last reload, if anything
   const listeners = [];
-  let queue = Promise.resolve(); // reloads run one after another
+  let queue = Promise.resolve(); // saves and reloads run one after another
 
   async function fetchAll() {
     try {
@@ -49,6 +49,24 @@ export function createCatalog({ api }) {
     return queue;
   }
 
+  /**
+   * Send one change, after any still running; once it's saved, reload
+   * everything. Resolves to the server's answer after the reload; rejects
+   * with the server's error, and then nothing is reloaded.
+   */
+  function save(method, url, body) {
+    const sent = queue.then(() => api(method, url, body));
+    queue = sent.then(fetchAll, () => {});
+    return sent.then((answer) => queue.then(() => answer));
+  }
+
+  /** One recipe as the recipe dialog shows it (with hearts), after any saves. */
+  function recipe(id) {
+    const fetched = queue.then(() => api("GET", `/api/recipes/${id}`));
+    queue = fetched.catch(() => {});
+    return fetched;
+  }
+
   /** Every item in the ingredient list, once each, A→Z: what can be searched and picked. */
   function items() {
     const all = new Map();
@@ -70,6 +88,20 @@ export function createCatalog({ api }) {
     recipes: () => recipes,
     recipeCategories: () => recipeCategories,
     items,
+    recipe,
+    createRecipe: (fields) => save("POST", "/api/recipes", fields),
+    /** Change only the fields given; resolves to the saved recipe. */
+    changeRecipe: (id, fields) => save("PATCH", `/api/recipes/${id}`, fields),
+    deleteRecipe: (id) => save("DELETE", `/api/recipes/${id}`),
+    createIngredient: (fields) => save("POST", "/api/ingredients", fields),
+    changeIngredient: (id, fields) => save("PUT", `/api/ingredients/${id}`, fields),
+    deleteIngredient: (id) => save("DELETE", `/api/ingredients/${id}`),
+    /** Add (on) or remove a person's heart on an ingredient or recipe item. */
+    setFavorite: (item, person, on) =>
+      save(
+        on ? "PUT" : "DELETE",
+        `/api/${item.type === "recipe" ? "recipes" : "ingredients"}/${item.id}/favorites/${person}`,
+      ),
   };
 }
 

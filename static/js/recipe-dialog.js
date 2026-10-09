@@ -1,7 +1,6 @@
 // The recipe dialog: one recipe, every part of it editable in place and
 // saved as soon as it changes.
 
-import { api } from "./api.js";
 import { catalog } from "./catalog.js";
 import {
   checkedChipIds,
@@ -17,14 +16,12 @@ import { pickSession } from "./pick-session.js";
 import { categoryChipOptions } from "./recipe-categories.js";
 
 let shownRecipe = null; // recipe shown in the recipe dialog
-let recipeChanged = false; // saved something since the dialog opened
 let editingIngredients = false; // ingredient list shows ✕, add box and picker link
-let recipeSaving = Promise.resolve(); // saves run one after another
 
 /** Fetch a recipe and show it in the recipe dialog. */
 export async function openRecipe(id) {
   try {
-    shownRecipe = await api("GET", `/api/recipes/${id}`);
+    shownRecipe = await catalog.recipe(id);
   } catch (err) {
     showToast(`Couldn't open recipe: ${err.message}`);
     return;
@@ -94,30 +91,26 @@ function renderRecipeComponent(component) {
 }
 
 /** Save some of the shown recipe's fields, then redraw it from the server's answer. */
-function saveRecipePatch(fields) {
+async function saveRecipePatch(fields) {
   const id = shownRecipe.id;
   const dialog = document.getElementById("recipe-dialog");
-  recipeSaving = recipeSaving.then(async () => {
-    const stillShown = () => dialog.open && shownRecipe.id === id;
-    try {
-      const recipe = await api("PATCH", `/api/recipes/${id}`, fields);
-      recipeChanged = true;
-      if (stillShown()) {
-        shownRecipe = recipe;
-        showDialogError(null, "recipe-error");
-        renderRecipeDialog();
-      }
-      showToast("Saved ✓");
-    } catch (err) {
-      if (stillShown()) {
-        showDialogError(err.message, "recipe-error");
-        renderRecipeDialog(); // undo what the failed change showed
-      } else {
-        showToast(`Couldn't save: ${err.message}`);
-      }
+  const stillShown = () => dialog.open && shownRecipe.id === id;
+  try {
+    const recipe = await catalog.changeRecipe(id, fields);
+    if (stillShown()) {
+      shownRecipe = recipe;
+      showDialogError(null, "recipe-error");
+      renderRecipeDialog();
     }
-  });
-  return recipeSaving;
+    showToast("Saved ✓");
+  } catch (err) {
+    if (stillShown()) {
+      showDialogError(err.message, "recipe-error");
+      renderRecipeDialog(); // undo what the failed change showed
+    } else {
+      showToast(`Couldn't save: ${err.message}`);
+    }
+  }
 }
 
 /**
@@ -185,8 +178,7 @@ async function deleteRecipe() {
     return;
   }
   try {
-    await api("DELETE", `/api/recipes/${shownRecipe.id}`);
-    recipeChanged = true;
+    await catalog.deleteRecipe(shownRecipe.id);
     document.getElementById("recipe-dialog").close();
   } catch (err) {
     resetDeleteButton("recipe-delete");
@@ -246,7 +238,7 @@ export function initRecipeDialog() {
       doneLabel: "Done ✓",
       onDone: async (picked) => {
         try {
-          await api("PATCH", `/api/recipes/${recipe.id}`, { components: picked });
+          await catalog.changeRecipe(recipe.id, { components: picked });
         } catch (err) {
           showToast(`Couldn't save: ${err.message}`);
           throw err;
@@ -261,11 +253,4 @@ export function initRecipeDialog() {
   document.getElementById("recipe-delete").addEventListener("click", deleteRecipe);
   const dialog = document.getElementById("recipe-dialog");
   document.getElementById("recipe-close").addEventListener("click", () => dialog.close());
-  // Once closed (and any last save is done), refresh what the change shows up in.
-  dialog.addEventListener("close", async () => {
-    await recipeSaving;
-    if (!recipeChanged) return;
-    recipeChanged = false;
-    await catalog.reload();
-  });
 }

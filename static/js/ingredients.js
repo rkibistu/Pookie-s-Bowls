@@ -2,14 +2,13 @@
 // recipe categories (e.g. sauces), favorites, the ⋯ row menu and the
 // add/edit ingredient dialog. Its rows are where a pick session picks.
 
-import { api } from "./api.js";
 import { catalog } from "./catalog.js";
 import { checkedChipIds, el, renderChips, resetDeleteButton, showDialogError } from "./dom.js";
 import { HEARTS, itemKey, renderItemLabel } from "./items.js";
 import { pickNewRecipe } from "./new-recipe.js";
 import { pickSession } from "./pick-session.js";
 import { openRecipe } from "./recipe-dialog.js";
-import { currentIdentity } from "./shell.js";
+import { currentIdentity, onIdentityChange } from "./shell.js";
 
 /** After the catalog reloads: its error, if any, then the list. */
 function catalogChanged() {
@@ -20,7 +19,7 @@ function catalogChanged() {
 }
 
 /** One card per ingredient category, then one per listed recipe category. */
-export function renderIngredients() {
+function renderIngredients() {
   // Double-clicking a row toggles the current identity's heart.
   document.getElementById("fav-hint").textContent =
     `${touchOnly.matches ? "Double-tap" : "Double-click"} to ${HEARTS[currentIdentity()]}`;
@@ -158,11 +157,10 @@ let justFavorited = null; // {key, person} of the heart just added, to animate i
 async function toggleFavorite(item, isFavorite) {
   const who = currentIdentity();
   const errorBox = document.getElementById("ingredients-error");
-  const base = item.type === "recipe" ? "recipes" : "ingredients";
+  // The list redraws as soon as the heart is saved; a new one pops in.
+  justFavorited = isFavorite ? null : { key: itemKey(item), person: who };
   try {
-    await api(isFavorite ? "DELETE" : "PUT", `/api/${base}/${item.id}/favorites/${who}`);
-    justFavorited = isFavorite ? null : { key: itemKey(item), person: who };
-    await catalog.reload();
+    await catalog.setFavorite(item, who, !isFavorite);
   } catch (err) {
     errorBox.textContent = `Couldn't update favorite: ${err.message}`;
     errorBox.hidden = false;
@@ -204,12 +202,11 @@ async function saveIngredient(event) {
   save.disabled = true;
   try {
     if (editingIngredient) {
-      await api("PUT", `/api/ingredients/${editingIngredient.id}`, body);
+      await catalog.changeIngredient(editingIngredient.id, body);
     } else {
-      await api("POST", "/api/ingredients", body);
+      await catalog.createIngredient(body);
     }
     document.getElementById("ingredient-dialog").close();
-    await catalog.reload();
   } catch (err) {
     showDialogError(err.message, "ingredient-error");
   } finally {
@@ -226,9 +223,8 @@ async function deleteIngredient() {
     return;
   }
   try {
-    await api("DELETE", `/api/ingredients/${editingIngredient.id}`);
+    await catalog.deleteIngredient(editingIngredient.id);
     document.getElementById("ingredient-dialog").close();
-    await catalog.reload();
   } catch (err) {
     resetDeleteButton("ingredient-delete");
     showDialogError(err.message, "ingredient-error");
@@ -252,4 +248,7 @@ export function initIngredients() {
     if (event.key === "Escape") closeRowMenu();
   });
   catalog.onChange(catalogChanged);
+  // Rows show picks, and the hint shows whose heart a double-tap adds.
+  pickSession.onChange(renderIngredients);
+  onIdentityChange(renderIngredients);
 }

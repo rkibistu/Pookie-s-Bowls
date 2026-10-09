@@ -1,7 +1,6 @@
 // A new recipe: the Draft, written in the New recipe dialog, with its picks
 // from a pick session or the dialog's own type-ahead.
 
-import { api } from "./api.js";
 import { catalog } from "./catalog.js";
 import { checkedChipIds, el, renderChips, showDialogError, showToast } from "./dom.js";
 import { initItemSearch } from "./item-search.js";
@@ -96,10 +95,9 @@ async function saveBuilt(event) {
   const save = document.getElementById("build-save");
   save.disabled = true;
   try {
-    const recipe = await api("POST", "/api/recipes", body);
+    const recipe = await catalog.createRecipe(body);
     document.getElementById("build-dialog").close();
     draft = null;
-    await catalog.reload();
     showToast(`“${recipe.name}” saved! ${recipeEmoji(recipe)}`);
   } catch (err) {
     showDialogError(err.message, "build-error");

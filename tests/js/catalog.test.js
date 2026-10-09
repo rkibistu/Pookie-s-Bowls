@@ -23,11 +23,20 @@ function fakeServer() {
       "/api/recipes": { recipes: [{ id: 7, name: "Spicy mayo", categories: [], components: [] }] },
     },
   };
+  server.slow = null; // "PATCH /api/recipes/7" → that request takes a while
   server.api = async (method, url, body) => {
-    server.calls.push(`${method} ${url}`);
-    await Promise.resolve();
-    if (server.fail === `${method} ${url}`) throw new Error("Server is down");
-    return structuredClone(server.data[url]);
+    const call = `${method} ${url}`;
+    server.calls.push(call);
+    await new Promise((resolve) => setTimeout(resolve, server.slow === call ? 20 : 0));
+    server.calls.push(`done ${call}`);
+    if (server.fail === call) throw new Error("Server is down");
+    if (method === "GET") return structuredClone(server.data[url]);
+    if (method === "PATCH") {
+      const recipe = server.data["/api/recipes"].recipes.find((r) => url.endsWith(`/${r.id}`));
+      Object.assign(recipe, body);
+      return structuredClone(recipe);
+    }
+    return null;
   };
   return server;
 }
@@ -76,4 +85,57 @@ test("a failed reload keeps the lists it had and says what went wrong", async ()
   await catalog.reload();
   assert.equal(catalog.loadError(), null);
   assert.deepEqual(catalog.recipes(), []);
+});
+
+test("after a save, both lists reload and every view hears about it", async () => {
+  const server = fakeServer();
+  const catalog = createCatalog({ api: server.api });
+  await catalog.reload();
+  let redraws = 0;
+  catalog.onChange(() => redraws++);
+  server.calls.length = 0;
+
+  const saved = await catalog.changeRecipe(7, { name: "Hot mayo" });
+
+  assert.equal(saved.name, "Hot mayo");
+  assert.deepEqual(catalog.recipes().map((r) => r.name), ["Hot mayo"]);
+  assert.equal(redraws, 1);
+  assert.deepEqual(
+    server.calls.filter((c) => !c.startsWith("done")),
+    ["PATCH /api/recipes/7", "GET /api/ingredients", "GET /api/recipes"],
+  );
+});
+
+test("saves run one after another, in the order they were made", async () => {
+  const server = fakeServer();
+  const catalog = createCatalog({ api: server.api });
+  await catalog.reload();
+  server.calls.length = 0;
+  server.slow = "PATCH /api/recipes/7";
+
+  await Promise.all([
+    catalog.changeRecipe(7, { notes: "first" }),
+    catalog.setFavorite({ type: "ingredient", id: 1 }, "her", true),
+  ]);
+
+  const patched = server.calls.indexOf("done PATCH /api/recipes/7");
+  const favorited = server.calls.indexOf("PUT /api/ingredients/1/favorites/her");
+  assert.ok(patched !== -1 && patched < favorited, server.calls.join("\n"));
+});
+
+test("a failed save says why and leaves the lists as they were", async () => {
+  const server = fakeServer();
+  const catalog = createCatalog({ api: server.api });
+  await catalog.reload();
+  let redraws = 0;
+  catalog.onChange(() => redraws++);
+  server.fail = "DELETE /api/recipes/7";
+
+  await assert.rejects(catalog.deleteRecipe(7), { message: "Server is down" });
+
+  assert.equal(redraws, 0);
+  assert.deepEqual(catalog.recipes().map((r) => r.name), ["Spicy mayo"]);
+  server.fail = null;
+  await catalog.deleteRecipe(7); // the next save still goes through
+  assert.equal(redraws, 1);
 });

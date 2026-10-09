@@ -1,10 +1,15 @@
 // The app shell: who is using it (identity → color theme) and which view is
 // shown. Both survive reloads in localStorage (per device).
 
-import { renderIngredients } from "./ingredients.js";
-
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
 const VIEW_KEY = "pookie-view"; // "ingredients" | "recipes"
+
+const identityListeners = [];
+
+/** Call listener whenever the identity changes. */
+export function onIdentityChange(listener) {
+  identityListeners.push(listener);
+}
 
 /** Apply the chosen identity: drives the color theme and button state. */
 function setIdentity(who) {
@@ -13,7 +18,7 @@ function setIdentity(who) {
   document.querySelectorAll(".identity-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.who === who);
   });
-  renderIngredients(); // hearts hint and double-click target follow the identity
+  identityListeners.forEach((listener) => listener());
 }
 
 export function currentIdentity() {

@@ -1,18 +1,20 @@
 import { el, pickChip } from "./dom.js";
-import { renderIngredients } from "./ingredients.js";
 import { itemKey } from "./items.js";
 import { currentView, setView } from "./shell.js";
 
 /**
  * Picking ingredients and listed recipes on the Ingredients page, with the
  * tray showing the picks. Callers say what the picks start as and what Done
- * does with them; the session handles the view, the tray and the list.
+ * does with them; the session handles the view and the tray, and onChange
+ * tells the list to redraw.
  */
 export const pickSession = (() => {
   // null when not picking; otherwise {picks, blocked, onDone, onCancel,
   // returnTo}: picks is Map<itemKey, {type, id, name}> in pick order, blocked
   // the item keys that can't be picked, returnTo the view to go back to.
   let session = null;
+  const listeners = [];
+  const notify = () => listeners.forEach((listener) => listener());
 
   /**
    * Start picking from a copy of picks ([{type, id, name}]). Done hands the
@@ -61,7 +63,7 @@ export const pickSession = (() => {
 
   function changed() {
     renderTray();
-    renderIngredients();
+    notify();
   }
 
   /** The floating tray: one chip per pick, each removable. */
@@ -88,7 +90,7 @@ export const pickSession = (() => {
     session = null;
     document.body.classList.remove("selecting");
     document.getElementById("build-tray").hidden = true;
-    renderIngredients();
+    notify();
     setView(returnTo);
   }
 
@@ -121,5 +123,8 @@ export const pickSession = (() => {
     document.getElementById("build-cancel").addEventListener("click", cancel);
   }
 
-  return { start, active, state, toggle, init };
+  /** Call listener whenever what state() says may have changed. */
+  const onChange = (listener) => listeners.push(listener);
+
+  return { start, active, state, toggle, onChange, init };
 })();
