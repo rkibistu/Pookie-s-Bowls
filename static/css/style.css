@@ -1588,6 +1588,44 @@ summary.chip-group-title {
         order: 0;
     }
 
+    .action-bar .spacer {
+        display: none;
+    }
+
+    /* A switch (Only orphans) as an icon: lit up in a filled circle while on. */
+    .action-bar .toggle {
+        position: relative;
+        flex: 1;
+        justify-content: center;
+        height: 40px;
+        color: var(--accent-ink);
+    }
+
+    .action-bar .toggle input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .action-bar .toggle .bar-icon {
+        box-sizing: border-box;
+        width: 36px;
+        height: 36px;
+        padding: 7px;
+        border-radius: 50%;
+        transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .action-bar .toggle:has(input:checked) .bar-icon {
+        background: var(--accent);
+        color: #fff;
+    }
+
+    .action-bar .toggle:has(input:focus-visible) .bar-icon {
+        outline: 2px solid var(--accent-ink);
+        outline-offset: 2px;
+    }
+
     .action-bar .bar-icon {
         display: block;
     }

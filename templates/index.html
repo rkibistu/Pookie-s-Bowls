@@ -94,13 +94,15 @@
         </section>
 
         <section class="view" id="view-all" hidden>
-            <div class="toolbar">
+            <div class="toolbar action-bar">
                 <label class="toggle">
                     <input type="checkbox" id="only-orphans">
-                    <span>Only orphans</span>
+                    <svg class="bar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8Z"/></svg>
+                    <span class="btn-label">Only orphans</span>
                 </label>
                 <span class="spacer"></span>
-                <button type="button" class="primary-btn" id="all-add-ingredient-btn">+ Add</button>
+                <button type="button" class="primary-btn" id="all-add-ingredient-btn">
+                    <svg class="bar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="btn-label">+ Add</span></button>
             </div>
             <p class="load-error" id="all-error" hidden></p>
             <section class="category-card" id="all-ingredients"></section>
