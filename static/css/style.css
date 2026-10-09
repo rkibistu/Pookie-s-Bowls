@@ -492,27 +492,6 @@ body {
     border-color: var(--accent);
 }
 
-/* The new recipe dialog's picks: wrap freely, no tray-sized scroll box. */
-.dialog-picks {
-    margin: 0;
-    max-height: none;
-}
-
-/* ☰ next to "Ingredients": goes to the ingredient list to pick. */
-.pick-list-btn {
-    width: 36px;
-    height: 36px;
-    margin-bottom: 6px;
-    background: var(--accent-soft);
-    color: var(--accent-ink);
-    font-weight: 700;
-}
-
-.pick-list-btn:hover,
-.pick-list-btn:focus-visible {
-    background: var(--accent);
-    color: #fff;
-}
 
 /* Selection mode: only picking is possible, so hide everything that edits or navigates. */
 body.selecting .app-nav,

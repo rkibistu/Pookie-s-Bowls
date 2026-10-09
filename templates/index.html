@@ -113,12 +113,14 @@
             </label>
 
             <div class="field">
-                <div class="field-header">
-                    <span class="field-label">Ingredients</span>
-                    <button type="button" class="icon-btn pick-list-btn" id="build-pick"
-                            title="Pick ingredients" aria-label="Pick ingredients">☰</button>
+                <span class="field-label">Ingredients</span>
+                <ul class="recipe-ingredients" id="build-dialog-picks"></ul>
+                <div class="filter-search">
+                    <input type="text" id="build-add-input" autocomplete="off"
+                           placeholder="+ Add ingredient…" aria-label="Add ingredient">
+                    <ul class="filter-suggestions" id="build-add-suggestions" hidden></ul>
                 </div>
-                <ul class="build-picks dialog-picks" id="build-dialog-picks"></ul>
+                <button type="button" class="text-btn" id="build-pick">Pick from list… ›</button>
             </div>
 
             <fieldset class="field">

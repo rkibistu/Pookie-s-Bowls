@@ -171,7 +171,7 @@ let justFavorited = null; // {key, person} of the heart just added, to animate i
 function renderIngredientLabel(item) {
   const label = el("span", "ingredient-label");
   label.append(el("span", "ingredient-name", item.name));
-  if (item.favorites.length) {
+  if (item.favorites && item.favorites.length) {
     const badges = el("span", "fav-badges");
     for (const person of item.favorites) {
       const heart = el("span", "fav-badge", HEARTS[person]);
@@ -375,6 +375,7 @@ function pickChip(label, removeLabel, onRemove) {
 function startDraft() {
   draft = { picks: new Map() };
   document.getElementById("build-form").reset();
+  document.getElementById("build-add-suggestions").hidden = true;
   renderChips("build-categories", categoryChipOptions(), defaultCategoryIds());
 }
 
@@ -456,21 +457,34 @@ function renderTray() {
   document.getElementById("build-count").textContent = String(builder.picks.size);
 }
 
-/** The draft's picks in the build dialog, each removable. */
+/**
+ * The draft's picks in the build dialog, always editable like the recipe
+ * page's ingredients in edit mode: ✕ to remove, plus the add box and picker.
+ */
 function renderDialogPicks() {
   const list = document.getElementById("build-dialog-picks");
   list.replaceChildren();
   if (draft.picks.size === 0) {
-    list.append(el("li", "build-empty", "No ingredients yet — tap ☰ to pick some"));
+    list.append(el("li", "recipe-ingredients-empty", "No ingredients yet"));
   }
   for (const [key, pick] of draft.picks) {
     list.append(
-      pickChip(itemLabel(pick), `Remove ${pick.name}`, () => {
-        draft.picks.delete(key);
-        renderDialogPicks();
-        if (builder) renderTray(); // same picks as the tray behind the dialog
+      renderComponentRow(pick, {
+        onRemove: () => {
+          draft.picks.delete(key);
+          draftPicksChanged();
+        },
       }),
     );
+  }
+}
+
+/** Redraw what shows the draft's picks, including the tray behind the dialog. */
+function draftPicksChanged() {
+  renderDialogPicks();
+  if (builder) {
+    renderTray();
+    renderIngredients();
   }
 }
 
@@ -563,6 +577,15 @@ function initBuilder() {
   });
   document.getElementById("build-form").addEventListener("submit", saveBuilt);
   document.getElementById("build-pick").addEventListener("click", pickFromDialog);
+  initItemSearch(
+    "build-add-input",
+    "build-add-suggestions",
+    (key) => draft.picks.has(key),
+    (item) => {
+      draft.picks.set(itemKey(item), item);
+      draftPicksChanged();
+    },
+  );
   document.getElementById("build-dialog-cancel").addEventListener("click", () => {
     document.getElementById("build-dialog").close();
     if (!builder) draft = null; // Back keeps picking; Cancel drops the draft
@@ -858,11 +881,27 @@ function renderRecipeDialog() {
   notes.classList.toggle("empty", !recipe.notes);
 }
 
-/** One ingredient row (✕ to remove while editing); a recipe inside this one opens on tap. */
+/** One of the shown recipe's ingredient rows (✕ to remove while editing). */
 function renderRecipeComponent(component) {
+  const key = itemKey(component);
+  return renderComponentRow(component, {
+    onOpen: () => openRecipe(component.id),
+    onRemove: editingIngredients
+      ? () =>
+          saveRecipePatch({
+            components: componentsBody(shownRecipe.components.filter((c) => itemKey(c) !== key)),
+          })
+      : null,
+  });
+}
+
+/**
+ * One ingredient row. A recipe inside (e.g. a sauce) opens with onOpen on
+ * tap, if given; onRemove, if given, adds a ✕.
+ */
+function renderComponentRow(component, { onOpen = null, onRemove = null } = {}) {
   const item = el("li", "recipe-ingredient");
-  if (component.type === "recipe") {
-    // A recipe inside this one (e.g. a sauce): tap to read it.
+  if (component.type === "recipe" && onOpen) {
     const open = el("button", "sub-recipe-btn");
     open.type = "button";
     open.append(
@@ -870,22 +909,18 @@ function renderRecipeComponent(component) {
       renderIngredientLabel(component),
       el("span", "sub-recipe-arrow", "›"),
     );
-    open.addEventListener("click", () => openRecipe(component.id));
+    open.addEventListener("click", onOpen);
     item.append(open);
   } else {
+    if (component.type === "recipe") item.append(el("span", null, SUB_RECIPE));
     item.append(renderIngredientLabel(component));
   }
-  if (!editingIngredients) return item;
+  if (!onRemove) return item;
 
   const remove = el("button", "recipe-ingredient-remove", "✕");
   remove.type = "button";
   remove.setAttribute("aria-label", `Remove ${component.name}`);
-  remove.addEventListener("click", () => {
-    const key = itemKey(component);
-    saveRecipePatch({
-      components: componentsBody(shownRecipe.components.filter((c) => itemKey(c) !== key)),
-    });
-  });
+  remove.addEventListener("click", onRemove);
   item.append(remove);
   return item;
 }
