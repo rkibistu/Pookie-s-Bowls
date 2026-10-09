@@ -1,4 +1,4 @@
-"""SQLite helpers: connection, schema init, and category seeding."""
+"""SQLite helpers: connection, schema init, and seeding a fresh database."""
 
 import os
 import sqlite3
@@ -9,25 +9,30 @@ from flask import g
 DB_PATH = os.environ.get("DB_PATH", "/data/pookie.db")
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
-# Fixed ingredient categories, in display order. Sauces are recipes, so they
-# live in SEED_RECIPE_CATEGORIES instead.
-SEED_CATEGORIES = [
-    ("protein", "Protein"),
-    ("base", "Base"),
-    ("fresh", "Fresh Vegetables / Fruits"),
-    ("cooked", "Cooked Vegetables / Fruits"),
-    ("topping", "Topping"),
-    ("extras", "Extras"),
+# The recipe categories a fresh database starts with, in order: (name, emoji).
+SEED_RECIPE_CATEGORIES = [
+    ("Poke bowl", "🥣"),
+    ("Sauce", "🥫"),
+    ("Soup", "🍲"),
 ]
 
-# The recipe categories a fresh database starts with, in order: (name, emoji,
-# listed_position). Recipes in a listed category show up on the Ingredients
-# page and can be picked into other recipes; None means not listed.
-SEED_RECIPE_CATEGORIES = [
-    ("Poke bowl", "🥣", None),
-    ("Sauce", "🥫", 0),
-    ("Soup", "🍲", None),
-]
+# The station a fresh database starts with: its sections in order (a name is
+# an ingredient section, ("recipes", name) lists that recipe category), and
+# the recipe category its new recipes start in.
+SEED_STATION = {
+    "name": "Poke",
+    "emoji": "🥣",
+    "recipe_category": "Poke bowl",
+    "sections": [
+        "Protein",
+        "Base",
+        "Fresh Vegetables / Fruits",
+        "Cooked Vegetables / Fruits",
+        "Topping",
+        "Extras",
+        ("recipes", "Sauce"),
+    ],
+}
 
 
 def get_connection(path=None):
@@ -53,7 +58,7 @@ def close_db(exc=None):
 
 
 def init_db():
-    """Create the database file's schema (if needed) and seed the categories."""
+    """Create the database file's schema (if needed) and seed a fresh one."""
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = get_connection()
     try:
@@ -63,20 +68,44 @@ def init_db():
 
 
 def set_up(conn):
-    """Create the schema (if needed) on conn and seed the categories."""
+    """Create the schema (if needed) on conn and seed it if it's empty.
+
+    Seeds go only into empty tables, so whatever someone deleted stays deleted.
+    """
     conn.executescript(SCHEMA_PATH.read_text())
-    for position, (slug, name) in enumerate(SEED_CATEGORIES):
-        conn.execute(
-            "INSERT OR IGNORE INTO categories (slug, name, position) "
-            "VALUES (?, ?, ?)",
-            (slug, name, position),
+    if _empty(conn, "recipe_categories"):
+        conn.executemany(
+            "INSERT INTO recipe_categories (name, emoji, position) VALUES (?, ?, ?)",
+            [(name, emoji, position) for position, (name, emoji) in enumerate(SEED_RECIPE_CATEGORIES)],
         )
-    # Only into an empty table: a category someone deleted stays deleted.
-    if conn.execute("SELECT COUNT(*) FROM recipe_categories").fetchone()[0] == 0:
-        for position, (name, emoji, listed) in enumerate(SEED_RECIPE_CATEGORIES):
-            conn.execute(
-                "INSERT INTO recipe_categories (name, emoji, position, listed_position) "
-                "VALUES (?, ?, ?, ?)",
-                (name, emoji, position, listed),
-            )
+    if _empty(conn, "stations"):
+        _seed_station(conn, SEED_STATION)
     conn.commit()
+
+
+def _empty(conn, table):
+    return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+
+
+def _seed_station(conn, station):
+    def category_id(name):
+        row = conn.execute("SELECT id FROM recipe_categories WHERE name = ?", (name,)).fetchone()
+        return row[0] if row else None
+
+    station_id = conn.execute(
+        "INSERT INTO stations (name, emoji, recipe_category_id) VALUES (?, ?, ?)",
+        (station["name"], station["emoji"], category_id(station["recipe_category"])),
+    ).lastrowid
+    for position, section in enumerate(station["sections"]):
+        if isinstance(section, tuple):
+            listed = category_id(section[1])
+            if listed is not None:
+                conn.execute(
+                    "INSERT INTO sections (station_id, position, recipe_category_id) VALUES (?, ?, ?)",
+                    (station_id, position, listed),
+                )
+        else:
+            conn.execute(
+                "INSERT INTO sections (station_id, position, name) VALUES (?, ?, ?)",
+                (station_id, position, section),
+            )

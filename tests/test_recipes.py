@@ -131,14 +131,3 @@ def test_the_list_shows_the_newest_recipe_first(conn, category):
         recipes.create(conn, {"name": name, "category_ids": [category("Poke bowl")]})
 
     assert [r["name"] for r in recipes.list_all(conn)] == ["Miso soup", "Salmon bowl", "Spicy mayo"]
-
-
-def test_only_listed_recipes_get_a_card_on_the_ingredients_page(conn, category):
-    recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("Sauce")]})
-    recipes.create(conn, {"name": "Salmon bowl", "category_ids": [category("Poke bowl")]})
-
-    sections = recipes.listed_sections(conn)
-
-    assert [(s["name"], [r["name"] for r in s["recipes"]]) for s in sections] == [
-        ("Sauce", ["Spicy mayo"])
-    ]

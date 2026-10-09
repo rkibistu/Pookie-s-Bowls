@@ -13,21 +13,27 @@ import { categoryChipOptions, defaultCategoryIds, recipeEmoji } from "./recipe-c
 // the dialog's form until it's saved or cancelled.
 let draft = null;
 
-/** Start a new recipe: empty form, with these picks. */
-function startDraft(picks = []) {
+/**
+ * Start a new recipe: empty form, with these picks, in categoryId (a
+ * station's category) or else the first category.
+ */
+function startDraft(picks = [], categoryId = null) {
   draft = { picks: picksByKey(picks) };
   document.getElementById("build-form").reset();
   document.getElementById("build-add-suggestions").hidden = true;
-  renderChips("build-categories", categoryChipOptions(), defaultCategoryIds());
+  renderChips("build-categories", categoryChipOptions(), defaultCategoryIds(categoryId));
 }
 
-/** From the Ingredients page: pick first, then Create opens the dialog with the picks. */
+/**
+ * From a station: pick first, then Create opens the dialog with the picks,
+ * in the station's recipe category.
+ */
 export function pickNewRecipe(picks = []) {
   pickSession.start({
     picks,
     doneLabel: "Create",
     onDone: (picked) => {
-      startDraft(picked);
+      startDraft(picked, catalog.currentStation()?.recipe_category_id);
       openBuildDialog();
     },
   });

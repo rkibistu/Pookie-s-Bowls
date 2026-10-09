@@ -10,14 +10,31 @@ function fakeServer() {
     fail: null, // "GET /api/recipes" → that request fails
     data: {
       "/api/recipe-categories": { categories: [{ id: 1, name: "Poke bowl", emoji: "🥣" }] },
-      "/api/ingredients": {
-        categories: [
-          { id: 1, slug: "protein", name: "Protein", ingredients: [{ id: 2, name: "Tofu", favorites: [] }] },
-          { id: 2, slug: "base", name: "Base", ingredients: [{ id: 1, name: "Rice", favorites: ["me"] }] },
-          { id: 3, slug: "extras", name: "Extras", ingredients: [{ id: 2, name: "Tofu", favorites: [] }] },
+      "/api/stations": {
+        stations: [
+          {
+            id: 1,
+            name: "Poke",
+            emoji: "🥣",
+            recipe_category_id: 1,
+            sections: [
+              { id: 1, kind: "ingredients", name: "Protein", items: [{ type: "ingredient", id: 2, name: "Tofu", favorites: [] }] },
+              {
+                id: 2,
+                kind: "recipes",
+                recipe_category_id: 2,
+                name: "Sauce",
+                emoji: "🥫",
+                items: [{ type: "recipe", id: 7, name: "Spicy mayo", favorites: [] }],
+              },
+            ],
+          },
         ],
-        recipe_sections: [
-          { id: 2, name: "Sauce", emoji: "🥫", recipes: [{ id: 7, name: "Spicy mayo", favorites: [] }] },
+      },
+      "/api/ingredients": {
+        ingredients: [
+          { id: 1, name: "Rice", section_ids: [], favorites: ["me"] },
+          { id: 2, name: "Tofu", section_ids: [1], favorites: [] },
         ],
       },
       "/api/recipes": { recipes: [{ id: 7, name: "Spicy mayo", categories: [], components: [] }] },
@@ -41,7 +58,7 @@ function fakeServer() {
   return server;
 }
 
-test("a reload fills both lists and tells every view", async () => {
+test("a reload fills every list and tells every view", async () => {
   const server = fakeServer();
   const catalog = createCatalog({ api: server.api });
   let redraws = 0;
@@ -55,13 +72,15 @@ test("a reload fills both lists and tells every view", async () => {
     catalog.items().map((x) => `${x.type}:${x.name}`),
     ["ingredient:Rice", "recipe:Spicy mayo", "ingredient:Tofu"],
   );
-  assert.deepEqual(catalog.ingredientCategories()[1].ingredients[0], {
+  assert.deepEqual(catalog.ingredients()[0], {
     id: 1,
     name: "Rice",
+    section_ids: [],
     favorites: ["me"],
     type: "ingredient",
   });
-  assert.equal(catalog.listedRecipeSections()[0].recipes[0].type, "recipe");
+  assert.equal(catalog.currentStation().name, "Poke");
+  assert.deepEqual(catalog.currentStation().sections.map((s) => s.name), ["Protein", "Sauce"]);
   assert.deepEqual(catalog.recipes().map((r) => r.name), ["Spicy mayo"]);
   assert.deepEqual(catalog.recipeCategories().map((c) => c.name), ["Poke bowl"]);
 });
@@ -102,7 +121,13 @@ test("after a save, everything reloads and every view hears about it", async () 
   assert.equal(redraws, 1);
   assert.deepEqual(
     server.calls.filter((c) => !c.startsWith("done")),
-    ["PATCH /api/recipes/7", "GET /api/recipe-categories", "GET /api/ingredients", "GET /api/recipes"],
+    [
+      "PATCH /api/recipes/7",
+      "GET /api/recipe-categories",
+      "GET /api/stations",
+      "GET /api/ingredients",
+      "GET /api/recipes",
+    ],
   );
 });
 

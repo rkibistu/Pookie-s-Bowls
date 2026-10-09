@@ -3,7 +3,7 @@ import { itemKey } from "./items.js";
 import { currentView, setView } from "./shell.js";
 
 /**
- * Picking ingredients and listed recipes on the Ingredients page, with the
+ * Picking ingredients and listed recipes on a station, with the
  * tray showing the picks. Callers say what the picks start as and what Done
  * does with them; the session handles the view and the tray, and onChange
  * tells the list to redraw.
@@ -39,7 +39,7 @@ export const pickSession = (() => {
     document.getElementById("build-create").textContent = doneLabel;
     document.body.classList.add("selecting");
     document.getElementById("build-tray").hidden = false;
-    setView("ingredients");
+    setView("station");
     changed();
   }
 

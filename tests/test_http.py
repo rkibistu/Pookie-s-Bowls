@@ -17,7 +17,7 @@ def bowl_category(client):
 
 
 def test_a_recipe_can_be_created_changed_and_deleted_over_http(client, bowl_category):
-    salmon = client.post("/api/ingredients", json={"name": "Salmon", "category_ids": [1]}).json
+    salmon = client.post("/api/ingredients", json={"name": "Salmon", "section_ids": [1]}).json
 
     created = client.post(
         "/api/recipes",
@@ -47,12 +47,12 @@ def test_recipe_errors_come_back_as_json_with_a_status(client):
 
 
 def test_an_ingredient_can_be_changed_and_its_errors_come_back_as_json(client):
-    tofu = client.post("/api/ingredients", json={"name": "Tofu", "category_ids": [1]}).json
+    tofu = client.post("/api/ingredients", json={"name": "Tofu", "section_ids": [1]}).json
 
     changed = client.patch(f"/api/ingredients/{tofu['id']}", json={"name": "Smoked tofu"})
-    assert (changed.status_code, changed.json["category_ids"]) == (200, [1])
+    assert (changed.status_code, changed.json["section_ids"]) == (200, [1])
 
-    taken = client.post("/api/ingredients", json={"name": "smoked TOFU", "category_ids": [1]})
+    taken = client.post("/api/ingredients", json={"name": "smoked TOFU", "section_ids": [1]})
     assert (taken.status_code, taken.json) == (
         409,
         {"error": "An ingredient with that name already exists."},
@@ -87,11 +87,42 @@ def test_a_recipe_category_can_be_created_changed_reordered_and_deleted_over_htt
         {"error": "A category with that name already exists."},
     )
 
-    listed = client.put("/api/recipe-categories/listed", json={"category_ids": [pizza]})
-    assert (listed.status_code, listed.json) == (200, {"category_ids": [pizza]})
-    sections = client.get("/api/ingredients").json["recipe_sections"]
-    assert [s["name"] for s in sections] == ["Pizza"]
-    assert client.put("/api/recipe-categories/listed", json={"category_ids": [pizza, pizza]}).status_code == 400
-
     assert client.delete(f"/api/recipe-categories/{pizza}").status_code == 204
     assert client.delete(f"/api/recipe-categories/{pizza}").status_code == 404
+
+
+def test_a_station_and_its_sections_can_be_changed_over_http(client):
+    [poke] = client.get("/api/stations").json["stations"]
+
+    renamed = client.patch(f"/api/stations/{poke['id']}", json={"emoji": "🍣"})
+    assert (renamed.status_code, renamed.json["emoji"]) == (200, "🍣")
+
+    added = client.post(f"/api/stations/{poke['id']}/sections", json={"name": "Nuts"})
+    assert (added.status_code, added.json["kind"]) == (201, "ingredients")
+    nuts = added.json["id"]
+    taken = client.post(f"/api/stations/{poke['id']}/sections", json={"name": "nuts"})
+    assert taken.status_code == 409
+
+    renamed = client.patch(f"/api/sections/{nuts}", json={"name": "Seeds"})
+    assert (renamed.status_code, renamed.json["name"]) == (200, "Seeds")
+
+    ids = [s["id"] for s in client.get("/api/stations").json["stations"][0]["sections"]]
+    moved = client.put(
+        f"/api/stations/{poke['id']}/sections/order", json={"section_ids": [nuts, *ids[:-1]]}
+    )
+    assert (moved.status_code, moved.json["sections"][0]["name"]) == (200, "Seeds")
+    assert client.put(f"/api/stations/{poke['id']}/sections/order", json={}).status_code == 400
+
+    assert client.delete(f"/api/sections/{nuts}").status_code == 204
+    assert client.delete(f"/api/sections/{nuts}").status_code == 404
+    assert client.patch(f"/api/stations/{poke['id']}", json={"emoji": "🥣"}).status_code == 200
+
+
+def test_every_ingredient_comes_back_including_orphans(client):
+    seaweed = client.post("/api/ingredients", json={"name": "Seaweed"})
+    assert (seaweed.status_code, seaweed.json["section_ids"]) == (201, [])
+
+    names = [i["name"] for i in client.get("/api/ingredients").json["ingredients"]]
+    assert "Seaweed" in names
+
+    assert client.delete(f"/api/ingredients/{seaweed.json['id']}").status_code == 204

@@ -2,7 +2,8 @@
 // shown. Both survive reloads in localStorage (per device).
 
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
-const VIEW_KEY = "pookie-view"; // "ingredients" | "recipes"
+const VIEW_KEY = "pookie-view"; // "station" | "recipes"
+const VIEWS = ["station", "recipes"];
 
 const identityListeners = [];
 
@@ -36,9 +37,10 @@ export function setView(view) {
   });
 }
 
-/** The view being shown: "ingredients" | "recipes". */
+/** The view being shown: "station" | "recipes". */
 export function currentView() {
-  return localStorage.getItem(VIEW_KEY) || "ingredients";
+  const view = localStorage.getItem(VIEW_KEY);
+  return VIEWS.includes(view) ? view : "station";
 }
 
 /** Restore the saved identity (default: "me") and view, and wire their buttons. */

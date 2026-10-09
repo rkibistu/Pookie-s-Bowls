@@ -4,7 +4,8 @@ Every function takes the database connection to work on and returns plain
 dicts; a broken rule raises RuleError. Nothing here knows about HTTP.
 
 An ingredient is a base item (sauces are recipes) with a name, unique
-ignoring case, and at least one ingredient category.
+ignoring case. Where it shows up is its section ids: ingredient sections on
+any stations, or none (an orphan).
 """
 
 import sqlite3
@@ -12,36 +13,29 @@ import sqlite3
 import favorites
 from errors import DUPLICATE, NOT_FOUND, RuleError
 
-FIELDS = ("name", "category_ids")
+FIELDS = ("name", "section_ids")
 
 
 # ---- Reading -------------------------------------------------------------
 
 
-def by_category(conn):
-    """All ingredient categories in display order, each with its ingredients
-    A→Z; an ingredient in several categories shows up under each."""
-    categories = [
-        {"id": r["id"], "slug": r["slug"], "name": r["name"], "ingredients": []}
-        for r in conn.execute("SELECT id, slug, name FROM categories ORDER BY position, id")
-    ]
-    by_id = {c["id"]: c for c in categories}
-    links = _category_ids(conn)
+def list_all(conn):
+    """Every ingredient A→Z, orphans included, with its section ids and favorites."""
+    links = _section_ids(conn)
     favorited = favorites.by_item(conn)
-    for r in conn.execute("SELECT id, name FROM ingredients ORDER BY name COLLATE NOCASE"):
-        ingredient = {
+    return [
+        {
             "id": r["id"],
             "name": r["name"],
-            "category_ids": links.get(r["id"], []),
+            "section_ids": links.get(r["id"], []),
             "favorites": favorited.get(("ingredient", r["id"]), []),
         }
-        for category_id in ingredient["category_ids"]:
-            by_id[category_id]["ingredients"].append(ingredient)
-    return categories
+        for r in conn.execute("SELECT id, name FROM ingredients ORDER BY name COLLATE NOCASE")
+    ]
 
 
 def get(conn, ingredient_id):
-    """One ingredient with its category ids."""
+    """One ingredient with its section ids."""
     row = conn.execute(
         "SELECT id, name FROM ingredients WHERE id = ?", (ingredient_id,)
     ).fetchone()
@@ -50,20 +44,20 @@ def get(conn, ingredient_id):
     return {
         "id": row["id"],
         "name": row["name"],
-        "category_ids": _category_ids(conn, ingredient_id).get(ingredient_id, []),
+        "section_ids": _section_ids(conn, ingredient_id).get(ingredient_id, []),
     }
 
 
-def _category_ids(conn, ingredient_id=None):
-    """Category ids per ingredient, ascending: {ingredient id: [category id]}."""
+def _section_ids(conn, ingredient_id=None):
+    """Section ids per ingredient, ascending: {ingredient id: [section id]}."""
     where, params = ("WHERE ingredient_id = ?", (ingredient_id,)) if ingredient_id else ("", ())
     links = {}
     for r in conn.execute(
-        f"SELECT ingredient_id, category_id FROM ingredient_categories {where} "
-        "ORDER BY category_id",
+        f"SELECT ingredient_id, section_id FROM section_ingredients {where} "
+        "ORDER BY section_id",
         params,
     ):
-        links.setdefault(r["ingredient_id"], []).append(r["category_id"])
+        links.setdefault(r["ingredient_id"], []).append(r["section_id"])
     return links
 
 
@@ -71,14 +65,17 @@ def _category_ids(conn, ingredient_id=None):
 
 
 def create(conn, fields):
-    """Save a new ingredient; name and category_ids are required."""
+    """Save a new ingredient; a name is required, section_ids may be left out
+    (an orphan)."""
     if not isinstance(fields, dict):
         raise RuleError("Expected a JSON object.")
-    ingredient = _parse(conn, {k: fields.get(k) for k in FIELDS})
+    ingredient = _parse(
+        conn, {"name": fields.get("name"), "section_ids": fields.get("section_ids", [])}
+    )
     try:
         with conn:
             cur = conn.execute("INSERT INTO ingredients (name) VALUES (?)", (ingredient["name"],))
-            _write_categories(conn, cur.lastrowid, ingredient["category_ids"])
+            _write_sections(conn, cur.lastrowid, ingredient["section_ids"])
     except sqlite3.IntegrityError:
         raise _duplicate_name()
     return get(conn, cur.lastrowid)
@@ -97,8 +94,8 @@ def change(conn, ingredient_id, fields):
                     "UPDATE ingredients SET name = ? WHERE id = ?",
                     (ingredient["name"], ingredient_id),
                 )
-            if "category_ids" in ingredient:
-                _write_categories(conn, ingredient_id, ingredient["category_ids"])
+            if "section_ids" in ingredient:
+                _write_sections(conn, ingredient_id, ingredient["section_ids"])
     except sqlite3.IntegrityError:
         raise _duplicate_name()
     return get(conn, ingredient_id)
@@ -121,7 +118,7 @@ def _parse(conn, fields):
     """Check the given fields; return them cleaned up."""
     parsers = {
         "name": _parse_name,
-        "category_ids": lambda v: _parse_category_ids(conn, v),
+        "section_ids": lambda v: _parse_section_ids(conn, v),
     }
     return {k: parsers[k](v) for k, v in fields.items()}
 
@@ -133,27 +130,28 @@ def _parse_name(name):
     return name
 
 
-def _parse_category_ids(conn, category_ids):
-    """Known ingredient category ids, sorted and unique; at least one."""
-    if not isinstance(category_ids, list) or not all(
-        isinstance(c, int) and not isinstance(c, bool) for c in category_ids
+def _parse_section_ids(conn, section_ids):
+    """Known ingredient section ids, sorted and unique; may be empty."""
+    if not isinstance(section_ids, list) or not all(
+        isinstance(c, int) and not isinstance(c, bool) for c in section_ids
     ):
-        raise RuleError("category_ids must be a list of category ids.")
-    category_ids = sorted(set(category_ids))
-    if not category_ids:
-        raise RuleError("Pick at least one category.")
-    placeholders = ",".join("?" * len(category_ids))
+        raise RuleError("section_ids must be a list of section ids.")
+    section_ids = sorted(set(section_ids))
+    if not section_ids:
+        return []
+    placeholders = ",".join("?" * len(section_ids))
     found = conn.execute(
-        f"SELECT COUNT(*) FROM categories WHERE id IN ({placeholders})", category_ids
+        f"SELECT COUNT(*) FROM sections WHERE name IS NOT NULL AND id IN ({placeholders})",
+        section_ids,
     ).fetchone()[0]
-    if found != len(category_ids):
-        raise RuleError("Unknown category.")
-    return category_ids
+    if found != len(section_ids):
+        raise RuleError("Unknown section.")
+    return section_ids
 
 
-def _write_categories(conn, ingredient_id, category_ids):
-    conn.execute("DELETE FROM ingredient_categories WHERE ingredient_id = ?", (ingredient_id,))
+def _write_sections(conn, ingredient_id, section_ids):
+    conn.execute("DELETE FROM section_ingredients WHERE ingredient_id = ?", (ingredient_id,))
     conn.executemany(
-        "INSERT INTO ingredient_categories (ingredient_id, category_id) VALUES (?, ?)",
-        [(ingredient_id, c) for c in category_ids],
+        "INSERT INTO section_ingredients (section_id, ingredient_id) VALUES (?, ?)",
+        [(s, ingredient_id) for s in section_ids],
     )

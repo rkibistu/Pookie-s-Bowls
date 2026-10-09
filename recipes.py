@@ -51,34 +51,6 @@ def list_all(conn):
     ]
 
 
-def listed_sections(conn):
-    """The listed recipe categories (e.g. sauces) in their listed order, each with
-    its recipes A→Z: the recipe cards on the Ingredients page."""
-    sections = [
-        {**dict(r), "recipes": []}
-        for r in conn.execute(
-            "SELECT id, name, emoji FROM recipe_categories "
-            "WHERE listed_position IS NOT NULL ORDER BY listed_position, id"
-        )
-    ]
-    by_id = {s["id"]: s for s in sections}
-    favorited = favorites.by_item(conn)
-    for r in conn.execute(
-        "SELECT l.category_id, r.id, r.name FROM recipe_category_links l "
-        "JOIN recipes r ON r.id = l.recipe_id "
-        "ORDER BY r.name COLLATE NOCASE"
-    ):
-        if r["category_id"] in by_id:
-            by_id[r["category_id"]]["recipes"].append(
-                {
-                    "id": r["id"],
-                    "name": r["name"],
-                    "favorites": favorited.get(("recipe", r["id"]), []),
-                }
-            )
-    return sections
-
-
 def _row(conn, recipe_id):
     row = conn.execute(
         "SELECT id, name, url, notes, created_at FROM recipes WHERE id = ?",

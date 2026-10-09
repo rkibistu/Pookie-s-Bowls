@@ -23,20 +23,20 @@
     </header>
 
     <nav class="app-nav">
-        <button type="button" class="nav-btn" data-view="ingredients">🥑 Ingredients</button>
+        <button type="button" class="nav-btn" data-view="station" id="station-nav">🥣 Station</button>
         <button type="button" class="nav-btn" data-view="recipes">📖 Recipes</button>
     </nav>
 
     <main class="app-main">
-        <section class="view" id="view-ingredients">
+        <section class="view" id="view-station">
             <div class="toolbar">
                 <p class="fav-hint" id="fav-hint"></p>
-                <button type="button" class="secondary-btn" id="sections-btn">✏️ Sections</button>
+                <button type="button" class="secondary-btn" id="station-btn">✏️ Station</button>
                 <button type="button" class="secondary-btn" id="new-recipe-btn">🥣 New recipe</button>
                 <button type="button" class="primary-btn" id="add-ingredient-btn">+ Add ingredient</button>
             </div>
-            <p class="load-error" id="ingredients-error" hidden></p>
-            <div id="ingredient-sections"></div>
+            <p class="load-error" id="station-error" hidden></p>
+            <div id="station-sections"></div>
         </section>
 
         <section class="view" id="view-recipes" hidden>
@@ -71,10 +71,10 @@
                 <input type="text" id="ingredient-name" maxlength="80" autocomplete="off" required>
             </label>
 
-            <fieldset class="field">
-                <legend class="field-label">Categories</legend>
-                <div class="chips" id="ingredient-categories"></div>
-            </fieldset>
+            <div class="field">
+                <span class="field-label">Sections</span>
+                <div id="ingredient-section-chips"></div>
+            </div>
 
             <p class="form-error" id="ingredient-error" hidden></p>
 
@@ -207,16 +207,37 @@
         </div>
     </dialog>
 
-    <dialog class="dialog" id="sections-dialog">
-        <h2>✏️ Sections</h2>
-        <p class="dialog-hint">Ticked recipe categories show here after the ingredients, and their recipes can be picked into others.</p>
-        <ul class="category-rows" id="section-rows"></ul>
+    <dialog class="dialog" id="station-dialog">
+        <h2>✏️ Station</h2>
 
-        <p class="form-error" id="sections-error" hidden></p>
+        <div class="category-row station-name-row">
+            <input type="text" class="category-emoji" id="station-emoji" maxlength="8"
+                   autocomplete="off" aria-label="Station emoji">
+            <input type="text" class="category-name" id="station-name" maxlength="40"
+                   autocomplete="off" aria-label="Station name">
+        </div>
+
+        <label class="field">
+            <span class="field-label">New recipes start as</span>
+            <select id="station-recipe-category"></select>
+        </label>
+
+        <div class="field">
+            <span class="field-label">Sections</span>
+            <p class="dialog-hint">Ingredient sections and ticked recipe categories, in the order they're shown. A ticked category's recipes can be picked into others.</p>
+            <ul class="category-rows" id="station-section-rows"></ul>
+            <form class="category-row category-add" id="section-add-form" novalidate>
+                <input type="text" class="category-name" id="section-add-name" maxlength="40"
+                       autocomplete="off" placeholder="New ingredient section…" aria-label="New section's name">
+                <button type="submit" class="secondary-btn">Add</button>
+            </form>
+        </div>
+
+        <p class="form-error" id="station-dialog-error" hidden></p>
 
         <div class="dialog-actions">
             <span class="spacer"></span>
-            <button type="button" class="secondary-btn" id="sections-close">Close</button>
+            <button type="button" class="secondary-btn" id="station-close">Close</button>
         </div>
     </dialog>
 

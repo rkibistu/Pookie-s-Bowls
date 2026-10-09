@@ -15,7 +15,7 @@ import ingredients  # noqa: E402
 
 @pytest.fixture
 def conn():
-    """A fresh in-memory database with the schema and fixed categories."""
+    """A fresh in-memory database with the schema and seeds."""
     conn = db.get_connection(":memory:")
     db.set_up(conn)
     yield conn
@@ -30,13 +30,17 @@ def category(conn):
 
 
 @pytest.fixture
-def ingredient(conn):
-    """Add an ingredient to the catalog; returns its id."""
+def section(conn):
+    """Ingredient section id on the seeded Poke station, by name: section("Protein")."""
+    ids = dict(conn.execute("SELECT name, id FROM sections WHERE name IS NOT NULL"))
+    return ids.__getitem__
 
-    def add(name, category="protein"):
-        category_id = conn.execute(
-            "SELECT id FROM categories WHERE slug = ?", (category,)
-        ).fetchone()[0]
-        return ingredients.create(conn, {"name": name, "category_ids": [category_id]})["id"]
+
+@pytest.fixture
+def ingredient(conn, section):
+    """Add an ingredient to the catalog, in one Poke section; returns its id."""
+
+    def add(name, in_section="Protein"):
+        return ingredients.create(conn, {"name": name, "section_ids": [section(in_section)]})["id"]
 
     return add

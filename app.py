@@ -10,6 +10,7 @@ import favorites
 import ingredients
 import recipe_categories
 import recipes
+import stations
 
 app = Flask(__name__)
 app.teardown_appcontext(db.close_db)
@@ -17,8 +18,8 @@ app.teardown_appcontext(db.close_db)
 # Ensure the database and seed data exist before serving any request.
 db.init_db()
 
-# The rules live in ingredients.py, recipes.py and recipe_categories.py; these
-# routes only speak HTTP.
+# The rules live in ingredients.py, recipes.py, recipe_categories.py and
+# stations.py; these routes only speak HTTP.
 
 STATUS = {errors.INVALID: 400, errors.NOT_FOUND: 404, errors.DUPLICATE: 409}
 
@@ -38,13 +39,8 @@ def index():
 
 @app.get("/api/ingredients")
 def list_ingredients():
-    """The Ingredients page: ingredient categories, then the listed recipe
-    categories (e.g. sauces) shown alongside them."""
-    conn = db.get_db()
-    return jsonify(
-        categories=ingredients.by_category(conn),
-        recipe_sections=recipes.listed_sections(conn),
-    )
+    """Every ingredient A→Z, orphans included, with its section ids."""
+    return jsonify(ingredients=ingredients.list_all(db.get_db()))
 
 
 @app.post("/api/ingredients")
@@ -63,6 +59,51 @@ def change_ingredient(ingredient_id):
 @app.delete("/api/ingredients/<int:ingredient_id>")
 def delete_ingredient(ingredient_id):
     ingredients.delete(db.get_db(), ingredient_id)
+    return "", 204
+
+
+# ---- Stations ------------------------------------------------------------
+
+
+@app.get("/api/stations")
+def list_stations():
+    """Every station with its sections and their rows."""
+    return jsonify(stations=stations.list_all(db.get_db()))
+
+
+@app.patch("/api/stations/<int:station_id>")
+def change_station(station_id):
+    """Change only the fields sent (name, emoji, recipe_category_id)."""
+    return jsonify(stations.change(db.get_db(), station_id, request.get_json(silent=True)))
+
+
+@app.post("/api/stations/<int:station_id>/sections")
+def add_section(station_id):
+    """Body: {name} for an ingredient section, or {recipe_category_id} to list one."""
+    added = stations.add_section(db.get_db(), station_id, request.get_json(silent=True))
+    return jsonify(added), 201
+
+
+@app.put("/api/stations/<int:station_id>/sections/order")
+def reorder_sections(station_id):
+    """Body: {section_ids: [every section of the station, in the new order]}."""
+    body = request.get_json(silent=True)
+    section_ids = body.get("section_ids") if isinstance(body, dict) else None
+    return jsonify(stations.reorder_sections(db.get_db(), station_id, section_ids))
+
+
+@app.patch("/api/sections/<int:section_id>")
+def rename_section(section_id):
+    """Body: {name}; only an ingredient section can be renamed here."""
+    body = request.get_json(silent=True)
+    name = body.get("name") if isinstance(body, dict) else None
+    return jsonify(stations.rename_section(db.get_db(), section_id, name))
+
+
+@app.delete("/api/sections/<int:section_id>")
+def delete_section(section_id):
+    """Delete an ingredient section, or unlist a recipe category from its station."""
+    stations.delete_section(db.get_db(), section_id)
     return "", 204
 
 
@@ -108,14 +149,6 @@ def reorder_recipe_categories():
     body = request.get_json(silent=True)
     category_ids = body.get("category_ids") if isinstance(body, dict) else None
     return jsonify(categories=recipe_categories.reorder(db.get_db(), category_ids))
-
-
-@app.put("/api/recipe-categories/listed")
-def set_listed_recipe_categories():
-    """Body: {category_ids: [the categories the Ingredients page lists, in order]}."""
-    body = request.get_json(silent=True)
-    category_ids = body.get("category_ids") if isinstance(body, dict) else None
-    return jsonify(category_ids=recipe_categories.set_listed(db.get_db(), category_ids))
 
 
 @app.delete("/api/recipe-categories/<int:category_id>")

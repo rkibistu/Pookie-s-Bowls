@@ -1,17 +1,18 @@
-// The catalog: everything the server knows that the views show (ingredients,
-// recipes, recipe categories), loaded in full and kept in one place, and every
-// change to it. Views read from it and redraw when onChange tells them to;
+// The catalog: everything the server knows that the views show (stations,
+// ingredients, recipes, recipe categories), loaded in full and kept in one
+// place, and every change to it. Views read from it and redraw when onChange tells them to;
 // they never call the server for these themselves.
 
 import { api as realApi } from "./api.js";
 import { itemKey } from "./items.js";
 
 // Ingredients and listed recipes are both "items": {type, id, name, favorites}.
+// A station's section rows come from the server as items already.
 const asItems = (list, type) => list.map((x) => ({ ...x, type }));
 
 export function createCatalog({ api }) {
-  let ingredientCategories = []; // each with its ingredients, as items
-  let listedRecipeSections = []; // recipe categories shown with them (e.g. sauces)
+  let stations = []; // each with its sections in order, their rows as items
+  let ingredients = []; // every ingredient A→Z, orphans too, as items
   let recipes = []; // newest first
   let recipeCategories = []; // in their order
   let loadError = null; // what went wrong with the last reload, if anything
@@ -20,20 +21,15 @@ export function createCatalog({ api }) {
 
   async function fetchAll() {
     try {
-      const [categoryList, lists, recipeList] = await Promise.all([
+      const [categoryList, stationList, ingredientList, recipeList] = await Promise.all([
         api("GET", "/api/recipe-categories"),
+        api("GET", "/api/stations"),
         api("GET", "/api/ingredients"),
         api("GET", "/api/recipes"),
       ]);
       recipeCategories = categoryList.categories;
-      ingredientCategories = lists.categories.map((c) => ({
-        ...c,
-        ingredients: asItems(c.ingredients, "ingredient"),
-      }));
-      listedRecipeSections = lists.recipe_sections.map((s) => ({
-        ...s,
-        recipes: asItems(s.recipes, "recipe"),
-      }));
+      stations = stationList.stations;
+      ingredients = asItems(ingredientList.ingredients, "ingredient");
       recipes = recipeList.recipes;
       loadError = null;
     } catch (err) {
@@ -66,14 +62,18 @@ export function createCatalog({ api }) {
     return fetched;
   }
 
-  /** Every item in the ingredient list, once each, A→Z: what can be searched and picked. */
+  /**
+   * Every ingredient (orphans too) and every recipe listed on any station,
+   * once each, A→Z: what can be searched and picked.
+   */
   function items() {
-    const all = new Map();
-    for (const category of ingredientCategories) {
-      for (const item of category.ingredients) all.set(itemKey(item), item);
-    }
-    for (const section of listedRecipeSections) {
-      for (const item of section.recipes) all.set(itemKey(item), item);
+    const all = new Map(ingredients.map((item) => [itemKey(item), item]));
+    for (const station of stations) {
+      for (const section of station.sections) {
+        if (section.kind === "recipes") {
+          for (const item of section.items) all.set(itemKey(item), item);
+        }
+      }
     }
     return [...all.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -82,8 +82,10 @@ export function createCatalog({ api }) {
     reload,
     onChange: (listener) => listeners.push(listener),
     loadError: () => loadError,
-    ingredientCategories: () => ingredientCategories,
-    listedRecipeSections: () => listedRecipeSections,
+    stations: () => stations,
+    /** The station being shown (for now the only one), or null before the first load. */
+    currentStation: () => stations[0] ?? null,
+    ingredients: () => ingredients,
     recipes: () => recipes,
     recipeCategories: () => recipeCategories,
     items,
@@ -103,9 +105,16 @@ export function createCatalog({ api }) {
     reorderRecipeCategories: (ids) =>
       save("PUT", "/api/recipe-categories/order", { category_ids: ids }),
     deleteRecipeCategory: (id) => save("DELETE", `/api/recipe-categories/${id}`),
-    /** List exactly these recipe categories on the Ingredients page, in this order: [id]. */
-    setListedRecipeCategories: (ids) =>
-      save("PUT", "/api/recipe-categories/listed", { category_ids: ids }),
+    /** Change only the fields given (name, emoji, recipe_category_id). */
+    changeStation: (id, fields) => save("PATCH", `/api/stations/${id}`, fields),
+    /** {name} adds an ingredient section, {recipe_category_id} lists that category. */
+    addSection: (stationId, fields) => save("POST", `/api/stations/${stationId}/sections`, fields),
+    renameSection: (id, name) => save("PATCH", `/api/sections/${id}`, { name }),
+    /** Delete an ingredient section, or unlist a recipe category. */
+    deleteSection: (id) => save("DELETE", `/api/sections/${id}`),
+    /** Put every section of the station in this order: [id]. */
+    reorderSections: (stationId, ids) =>
+      save("PUT", `/api/stations/${stationId}/sections/order`, { section_ids: ids }),
     /** Add (on) or remove a person's heart on an ingredient or recipe item. */
     setFavorite: (item, person, on) =>
       save(

@@ -3,15 +3,8 @@
 
 PRAGMA foreign_keys = ON;
 
--- Fixed ingredient categories (seeded on first run).
-CREATE TABLE IF NOT EXISTS categories (
-    id       INTEGER PRIMARY KEY,
-    slug     TEXT    NOT NULL UNIQUE,
-    name     TEXT    NOT NULL,
-    position INTEGER NOT NULL DEFAULT 0
-);
-
--- Base ingredients only (sauces etc. are recipes).
+-- Base ingredients only (sauces etc. are recipes). One catalog, shared by
+-- every station (see docs/adr/0001).
 CREATE TABLE IF NOT EXISTS ingredients (
     id         INTEGER PRIMARY KEY,
     name       TEXT    NOT NULL,
@@ -22,29 +15,58 @@ CREATE TABLE IF NOT EXISTS ingredients (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ingredients_name
     ON ingredients (name COLLATE NOCASE);
 
--- An ingredient can belong to several categories.
-CREATE TABLE IF NOT EXISTS ingredient_categories (
-    ingredient_id INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
-    category_id   INTEGER NOT NULL REFERENCES categories(id)  ON DELETE CASCADE,
-    PRIMARY KEY (ingredient_id, category_id)
-);
-
 -- Recipe categories (poke bowl, sauce, soup… seeded on a fresh database; the
--- people using the app add, rename, reorder and delete them). A listed
--- category (e.g. sauces) has a listed_position: its recipes are shown on the
--- Ingredients page, in that order, and can be picked into other recipes.
--- NULL means not listed. position is the recipe category order, separate.
+-- people using the app add, rename, reorder and delete them).
 CREATE TABLE IF NOT EXISTS recipe_categories (
-    id              INTEGER PRIMARY KEY,
-    name            TEXT    NOT NULL,
-    emoji           TEXT    NOT NULL,
-    position        INTEGER NOT NULL DEFAULT 0,
-    listed_position INTEGER
+    id       INTEGER PRIMARY KEY,
+    name     TEXT    NOT NULL,
+    emoji    TEXT    NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0
 );
 
 -- Recipe category names are unique, ignoring case.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_recipe_categories_name
     ON recipe_categories (name COLLATE NOCASE);
+
+-- Stations: pages set up for picking one kind of recipe (🥣 Poke, 🍔 Burger…).
+-- Recipes started on a station begin in its recipe category; NULL (or a
+-- deleted one) means the first recipe category.
+CREATE TABLE IF NOT EXISTS stations (
+    id                 INTEGER PRIMARY KEY,
+    name               TEXT    NOT NULL,
+    emoji              TEXT    NOT NULL,
+    position           INTEGER NOT NULL DEFAULT 0,
+    recipe_category_id INTEGER REFERENCES recipe_categories(id) ON DELETE SET NULL
+);
+
+-- Station names are unique, ignoring case.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_stations_name
+    ON stations (name COLLATE NOCASE);
+
+-- A station's sections, in order. Each is EITHER an ingredient section of
+-- its own (a name; ingredients go in it) OR a listed recipe category (its
+-- recipes are shown there and can be picked), never both and never neither.
+CREATE TABLE IF NOT EXISTS sections (
+    id                 INTEGER PRIMARY KEY,
+    station_id         INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+    position           INTEGER NOT NULL DEFAULT 0,
+    name               TEXT,
+    recipe_category_id INTEGER REFERENCES recipe_categories(id) ON DELETE CASCADE,
+    CHECK ((name IS NOT NULL) + (recipe_category_id IS NOT NULL) = 1),
+    UNIQUE (station_id, recipe_category_id)
+);
+
+-- Ingredient section names are unique per station, ignoring case.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sections_name
+    ON sections (station_id, name COLLATE NOCASE);
+
+-- Which ingredient sections an ingredient is in: any number, on any
+-- stations, or none (an orphan).
+CREATE TABLE IF NOT EXISTS section_ingredients (
+    section_id    INTEGER NOT NULL REFERENCES sections(id)    ON DELETE CASCADE,
+    ingredient_id INTEGER NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
+    PRIMARY KEY (section_id, ingredient_id)
+);
 
 -- All recipes. Each may have a link (url) and/or components; both are
 -- optional. What it is lives in its categories.

@@ -226,7 +226,7 @@ body {
     margin: 0 0 16px;
 }
 
-#ingredient-sections {
+#station-sections {
     display: grid;
     gap: 16px;
 }
@@ -545,7 +545,7 @@ body {
 /* Selection mode: only picking is possible, so hide everything that edits or navigates. */
 body.selecting .app-nav,
 body.selecting #add-ingredient-btn,
-body.selecting #sections-btn,
+body.selecting #station-btn,
 body.selecting #new-recipe-btn,
 body.selecting .fav-hint,
 body.selecting .ingredient-row .icon-btn,
@@ -1144,7 +1144,47 @@ body.selecting .ingredient-row.unpickable::after {
     border-color: var(--border);
 }
 
-/* ---- Sections dialog -------------------------------------------------- */
+/* ---- Station dialog --------------------------------------------------- */
+.station-name-row {
+    border-bottom: none;
+    margin-bottom: 12px;
+}
+
+.station-name-row .category-name {
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+.field select {
+    width: 100%;
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 1rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+}
+
+.field select:focus {
+    border-color: var(--accent);
+}
+
+/* The ingredient dialog's section chips, one group per station. */
+.chip-group {
+    border: none;
+    padding: 0;
+    margin: 0 0 10px;
+}
+
+.chip-group-title {
+    padding: 0;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
 .section-row {
     min-height: 48px;
 }

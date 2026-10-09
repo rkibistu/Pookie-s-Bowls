@@ -8,8 +8,8 @@ decides a recipe's emoji (its first category's) and the category a new recipe
 starts in (the first). Every recipe stays in at least one category, so the
 last one can't be deleted.
 
-Which categories are listed on the Ingredients page, and in what order, is
-the Ingredients page's choice (set_listed); that order is separate.
+Which categories a station lists, and in what order, is the station's
+choice (see stations.py); that order is separate.
 """
 
 import sqlite3
@@ -50,8 +50,7 @@ def _as_dict(row):
 
 
 def create(conn, fields):
-    """Save a new, unlisted category at the end of the order; name and emoji
-    are required."""
+    """Save a new category at the end of the order; name and emoji are required."""
     if not isinstance(fields, dict):
         raise RuleError("Expected a JSON object.")
     category = _parse({k: fields.get(k) for k in FIELDS})
@@ -129,26 +128,6 @@ def delete(conn, category_id):
         )
     with conn:
         conn.execute("DELETE FROM recipe_categories WHERE id = ?", (category_id,))
-
-
-def set_listed(conn, category_ids):
-    """List exactly these categories on the Ingredients page, in this order;
-    every other one stops being listed. Returns the listed ids, in order."""
-    known = {c["id"] for c in list_all(conn)}
-    if (
-        not isinstance(category_ids, list)
-        or not all(isinstance(c, int) and not isinstance(c, bool) for c in category_ids)
-        or len(set(category_ids)) != len(category_ids)
-        or not set(category_ids) <= known
-    ):
-        raise RuleError("category_ids must list known categories, each once.")
-    with conn:
-        conn.execute("UPDATE recipe_categories SET listed_position = NULL")
-        conn.executemany(
-            "UPDATE recipe_categories SET listed_position = ? WHERE id = ?",
-            list(enumerate(category_ids)),
-        )
-    return category_ids
 
 
 def _duplicate_name():

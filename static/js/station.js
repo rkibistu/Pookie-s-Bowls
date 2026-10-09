@@ -1,37 +1,46 @@
-// The Ingredients view: one card per ingredient category plus the listed
-// recipe categories (e.g. sauces), favorites, the ⋯ row menu and the
-// add/edit ingredient dialog. Its rows are where a pick session picks.
+// The station view: one card per section, in the station's order (ingredient
+// sections and listed recipe categories, e.g. sauces), favorites, the ⋯ row
+// menu and the add/edit ingredient dialog. Its rows are where a pick session
+// picks.
 
 import { catalog } from "./catalog.js";
-import { checkedChipIds, el, renderChips, resetDeleteButton, showDialogError } from "./dom.js";
+import { el, renderChips, resetDeleteButton, showDialogError } from "./dom.js";
 import { HEARTS, itemKey, renderItemLabel } from "./items.js";
 import { pickNewRecipe } from "./new-recipe.js";
 import { pickSession } from "./pick-session.js";
 import { openRecipe } from "./recipe-dialog.js";
 import { currentIdentity, onIdentityChange } from "./shell.js";
 
-/** After the catalog reloads: its error, if any, then the list. */
+/** After the catalog reloads: its error, if any, the nav button, then the list. */
 function catalogChanged() {
-  const errorBox = document.getElementById("ingredients-error");
+  const errorBox = document.getElementById("station-error");
   errorBox.textContent = catalog.loadError() || "";
   errorBox.hidden = !catalog.loadError();
-  renderIngredients();
+  const station = catalog.currentStation();
+  if (station) document.getElementById("station-nav").textContent = `${station.emoji} ${station.name}`;
+  renderStation();
 }
 
-/** One card per ingredient category, then one per listed recipe category. */
-function renderIngredients() {
+/** One card per section of the station, in its order. */
+function renderStation() {
   // Double-clicking a row toggles the current identity's heart.
   document.getElementById("fav-hint").textContent =
     `${touchOnly.matches ? "Double-tap" : "Double-click"} to ${HEARTS[currentIdentity()]}`;
-  const container = document.getElementById("ingredient-sections");
+  const container = document.getElementById("station-sections");
   container.replaceChildren();
-  for (const category of catalog.ingredientCategories()) {
-    container.append(renderCategoryCard(category.name, category.ingredients));
+  const station = catalog.currentStation();
+  if (!station) return;
+  if (station.sections.length === 0) {
+    container.append(el("p", "placeholder", "No sections yet — add some with ✏️ Station"));
   }
-  for (const section of catalog.listedRecipeSections()) {
-    container.append(renderCategoryCard(`${section.emoji} ${section.name}`, section.recipes));
+  for (const section of station.sections) {
+    container.append(renderCategoryCard(sectionTitle(section), section.items));
   }
 }
+
+/** "Protein", or "🥫 Sauce" for a listed recipe category. */
+const sectionTitle = (section) =>
+  section.kind === "recipes" ? `${section.emoji} ${section.name}` : section.name;
 
 function renderCategoryCard(title, items) {
   const card = el("section", "category-card");
@@ -156,7 +165,7 @@ let justFavorited = null; // {key, person} of the heart just added, to animate i
 
 async function toggleFavorite(item, isFavorite) {
   const who = currentIdentity();
-  const errorBox = document.getElementById("ingredients-error");
+  const errorBox = document.getElementById("station-error");
   // The list redraws as soon as the heart is saved; a new one pops in.
   justFavorited = isFavorite ? null : { key: itemKey(item), person: who };
   try {
@@ -174,14 +183,16 @@ let editingIngredient = null; // null while adding, the ingredient while editing
 /** Open the add/edit dialog; pass an ingredient to edit it. */
 function openIngredientDialog(ingredient = null) {
   editingIngredient = ingredient;
-  const selected = new Set(ingredient ? ingredient.category_ids : []);
+  // A row's item has no section ids; the catalog's ingredient does.
+  const stored = ingredient && catalog.ingredients().find((i) => i.id === ingredient.id);
+  const selected = new Set(stored ? stored.section_ids : []);
 
   document.getElementById("ingredient-dialog-title").textContent = ingredient
     ? "Edit ingredient"
     : "Add ingredient";
   document.getElementById("ingredient-name").value = ingredient ? ingredient.name : "";
 
-  renderChips("ingredient-categories", catalog.ingredientCategories(), selected);
+  renderSectionChips(selected);
 
   const del = document.getElementById("ingredient-delete");
   del.hidden = !ingredient;
@@ -192,11 +203,35 @@ function openIngredientDialog(ingredient = null) {
   if (!ingredient) document.getElementById("ingredient-name").focus();
 }
 
+/**
+ * One group of chips per station, the current one first: the ingredient
+ * sections the ingredient is in. None ticked is fine (an orphan).
+ */
+function renderSectionChips(selected) {
+  const box = document.getElementById("ingredient-section-chips");
+  box.replaceChildren();
+  const current = catalog.currentStation();
+  const stations = [current, ...catalog.stations().filter((s) => s !== current)].filter(Boolean);
+  for (const station of stations) {
+    const sections = station.sections.filter((s) => s.kind === "ingredients");
+    if (sections.length === 0) continue;
+    const group = el("fieldset", "chip-group");
+    const chips = el("div", "chips");
+    chips.id = `ingredient-station-${station.id}`;
+    group.append(el("legend", "chip-group-title", `${station.emoji} ${station.name}`), chips);
+    box.append(group);
+    renderChips(chips.id, sections, selected);
+  }
+  if (!box.children.length) box.append(el("p", "dialog-hint", "No ingredient sections yet"));
+}
+
 async function saveIngredient(event) {
   event.preventDefault();
   const body = {
     name: document.getElementById("ingredient-name").value,
-    category_ids: checkedChipIds("ingredient-categories"),
+    section_ids: [...document.querySelectorAll("#ingredient-section-chips input:checked")].map(
+      (box) => Number(box.value),
+    ),
   };
   const save = document.getElementById("ingredient-save");
   save.disabled = true;
@@ -231,7 +266,7 @@ async function deleteIngredient() {
   }
 }
 
-export function initIngredients() {
+export function initStation() {
   document
     .getElementById("add-ingredient-btn")
     .addEventListener("click", () => openIngredientDialog());
@@ -249,6 +284,6 @@ export function initIngredients() {
   });
   catalog.onChange(catalogChanged);
   // Rows show picks, and the hint shows whose heart a double-tap adds.
-  pickSession.onChange(renderIngredients);
-  onIdentityChange(renderIngredients);
+  pickSession.onChange(renderStation);
+  onIdentityChange(renderStation);
 }
