@@ -35,7 +35,7 @@ Terms are in `CONTEXT.md`: **Station**, **Section**, **Ingredient section**, **L
   - Each ingredient section's header gets a **"+"** that does the same, straight into that section.
   - Choosing an existing ingredient adds it to the section(s); it is never duplicated. Typing a name that already exists (ignoring case) and confirming does the same. A new name creates the ingredient.
 - **The ingredient dialog** (✏️ on a row) shows section chips grouped by station, with the current station first, so you can see and change where the ingredient appears everywhere.
-- **The All ingredients page** lists every ingredient A→Z, each tagged with where it appears ("Poke · Protein", "Sushi · Fish") or "on no station". An "Only orphans" toggle narrows the list. Rows work like station rows: ✏️ edit, favorites, and picking during a pick session. Its **+ Add ingredient** uses the same type-ahead and creates the ingredient with no sections.
+- **The All ingredients page** lists every ingredient A→Z, each tagged with where it appears ("Poke · Protein", "Sushi · Fish") or "on no station". An "Only orphans" toggle narrows the list. Rows work like station rows: ✏️ edit, favorites, and picking during a pick session. Its **+ Add ingredient** uses the same type-ahead, with every station's section chips in groups that fold open; none ticked makes an orphan.
 - **Pick sessions:**
   - Station buttons and All ingredients stay visible while picking; Recipes stays hidden.
   - Switching between them keeps the picks.

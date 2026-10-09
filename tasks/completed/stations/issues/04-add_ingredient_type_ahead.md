@@ -13,7 +13,7 @@ Adding an ingredient suggests existing ingredients as you type, the way the reci
   - Choosing a suggestion pre-ticks the sections it's already in on this station, and saving adds or removes it from them.
   - A new name creates the ingredient in the ticked sections.
 - **A "+" in each ingredient section's header:** the same type-ahead, with no chips. Choosing an existing ingredient adds it to that section; a new name creates it there.
-- **On the All ingredients page** (if ticket 03 is in): the same type-ahead, and a new name creates an orphan.
+- **On the All ingredients page**: the same type-ahead, with chips for every station's ingredient sections, in groups that start folded (each shows how many are ticked). A new name with nothing ticked is an orphan; choosing an existing ingredient opens it for editing.
 - Typing a name that already exists, ignoring case (e.g. "salmon"), and confirming without choosing the suggestion behaves as if you had chosen it. A toast says so: "Salmon was already in the catalog, added to Protein".
 
 ## Notes

@@ -82,12 +82,15 @@
         <form id="ingredient-form" novalidate>
             <h2 id="ingredient-dialog-title">Add ingredient</h2>
 
-            <label class="field">
-                <span class="field-label">Name</span>
-                <input type="text" id="ingredient-name" maxlength="80" autocomplete="off" required>
-            </label>
-
             <div class="field">
+                <label class="field-label" for="ingredient-name">Name</label>
+                <div class="filter-search">
+                    <input type="text" id="ingredient-name" maxlength="80" autocomplete="off" required>
+                    <ul class="filter-suggestions" id="ingredient-suggestions" hidden></ul>
+                </div>
+            </div>
+
+            <div class="field" id="ingredient-sections-field">
                 <span class="field-label">Sections</span>
                 <div id="ingredient-section-chips"></div>
             </div>

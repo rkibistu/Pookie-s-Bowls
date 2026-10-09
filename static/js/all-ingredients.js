@@ -4,9 +4,10 @@
 
 import { catalog } from "./catalog.js";
 import { el } from "./dom.js";
+import { openAddIngredient } from "./ingredient-dialog.js";
 import { pickSession } from "./pick-session.js";
 import { onIdentityChange } from "./shell.js";
-import { openIngredientDialog, renderItemRow } from "./station.js";
+import { renderItemRow } from "./station.js";
 
 const ORPHAN = "on no station";
 
@@ -65,5 +66,5 @@ export function initAllIngredients() {
   // A new ingredient from here has no sections until you give it some.
   document
     .getElementById("all-add-ingredient-btn")
-    .addEventListener("click", () => openIngredientDialog());
+    .addEventListener("click", () => openAddIngredient());
 }

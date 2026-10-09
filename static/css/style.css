@@ -566,6 +566,7 @@ body.selecting #new-station-btn,
 body.selecting .nav-btn[data-view="recipes"],
 body.selecting #add-ingredient-btn,
 body.selecting #all-add-ingredient-btn,
+body.selecting .section-add,
 body.selecting #station-btn,
 body.selecting #new-recipe-btn,
 body.selecting .fav-hint,
@@ -1192,18 +1193,18 @@ body.selecting .ingredient-row.unpickable::after {
     border-color: var(--accent);
 }
 
-/* The ingredient dialog's section chips, one group per station. */
+/* The ingredient dialog's section chips, one fold-out group per station. */
 .chip-group {
-    border: none;
-    padding: 0;
     margin: 0 0 10px;
 }
 
 .chip-group-title {
-    padding: 0;
+    padding: 4px 0;
     margin-bottom: 6px;
     font-size: 0.85rem;
+    font-weight: 600;
     color: var(--muted);
+    cursor: pointer;
 }
 
 .section-row {
@@ -1254,4 +1255,18 @@ body.selecting .ingredient-row.unpickable::after {
     color: var(--muted);
     font-size: 0.8rem;
     font-weight: normal;
+}
+
+/* "+" in an ingredient section's header: add an ingredient straight into it. */
+.category-header .category-title {
+    margin-right: auto; /* the count and "+" sit together on the right */
+}
+
+.category-header .section-add {
+    width: 32px;
+    height: 32px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
 }

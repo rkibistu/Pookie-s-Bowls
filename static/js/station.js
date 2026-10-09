@@ -1,10 +1,10 @@
 // The station view: one card per section, in the station's order (ingredient
-// sections and listed recipe categories, e.g. sauces), favorites, the ⋯ row
-// menu and the add/edit ingredient dialog. Its rows are where a pick session
-// picks.
+// sections and listed recipe categories, e.g. sauces), favorites and the ⋯
+// row menu. Its rows are where a pick session picks.
 
 import { catalog } from "./catalog.js";
-import { el, renderChips, resetDeleteButton, showDialogError } from "./dom.js";
+import { el } from "./dom.js";
+import { openAddIngredient, openIngredientDialog } from "./ingredient-dialog.js";
 import { HEARTS, itemKey, renderItemLabel } from "./items.js";
 import { pickNewRecipe } from "./new-recipe.js";
 import { pickSession } from "./pick-session.js";
@@ -62,7 +62,14 @@ function renderStation() {
     container.append(el("p", "placeholder", "No sections yet — add some with ✏️ Station"));
   }
   for (const section of station.sections) {
-    container.append(renderCategoryCard(sectionTitle(section), section.items));
+    const card = renderCategoryCard(sectionTitle(section), section.items);
+    if (section.kind === "ingredients") {
+      const add = rowButton("section-add", "+", `Add to ${section.name}`, () =>
+        openAddIngredient({ section }),
+      );
+      card.querySelector(".category-header").append(add);
+    }
+    container.append(card);
   }
 }
 
@@ -209,103 +216,10 @@ async function toggleFavorite(item, isFavorite) {
   }
 }
 
-let editingIngredient = null; // null while adding, the ingredient while editing
-
-/** Open the add/edit dialog; pass an ingredient to edit it. */
-export function openIngredientDialog(ingredient = null) {
-  editingIngredient = ingredient;
-  // A row's item has no section ids; the catalog's ingredient does.
-  const stored = ingredient && catalog.ingredients().find((i) => i.id === ingredient.id);
-  const selected = new Set(stored ? stored.section_ids : []);
-
-  document.getElementById("ingredient-dialog-title").textContent = ingredient
-    ? "Edit ingredient"
-    : "Add ingredient";
-  document.getElementById("ingredient-name").value = ingredient ? ingredient.name : "";
-
-  renderSectionChips(selected);
-
-  const del = document.getElementById("ingredient-delete");
-  del.hidden = !ingredient;
-  resetDeleteButton("ingredient-delete");
-  showDialogError(null, "ingredient-error");
-
-  document.getElementById("ingredient-dialog").showModal();
-  if (!ingredient) document.getElementById("ingredient-name").focus();
-}
-
-/**
- * One group of chips per station, the current one first: the ingredient
- * sections the ingredient is in. None ticked is fine (an orphan).
- */
-function renderSectionChips(selected) {
-  const box = document.getElementById("ingredient-section-chips");
-  box.replaceChildren();
-  const current = catalog.currentStation();
-  const stations = [current, ...catalog.stations().filter((s) => s !== current)].filter(Boolean);
-  for (const station of stations) {
-    const sections = station.sections.filter((s) => s.kind === "ingredients");
-    if (sections.length === 0) continue;
-    const group = el("fieldset", "chip-group");
-    const chips = el("div", "chips");
-    chips.id = `ingredient-station-${station.id}`;
-    group.append(el("legend", "chip-group-title", `${station.emoji} ${station.name}`), chips);
-    box.append(group);
-    renderChips(chips.id, sections, selected);
-  }
-  if (!box.children.length) box.append(el("p", "dialog-hint", "No ingredient sections yet"));
-}
-
-async function saveIngredient(event) {
-  event.preventDefault();
-  const body = {
-    name: document.getElementById("ingredient-name").value,
-    section_ids: [...document.querySelectorAll("#ingredient-section-chips input:checked")].map(
-      (box) => Number(box.value),
-    ),
-  };
-  const save = document.getElementById("ingredient-save");
-  save.disabled = true;
-  try {
-    if (editingIngredient) {
-      await catalog.changeIngredient(editingIngredient.id, body);
-    } else {
-      await catalog.createIngredient(body);
-    }
-    document.getElementById("ingredient-dialog").close();
-  } catch (err) {
-    showDialogError(err.message, "ingredient-error");
-  } finally {
-    save.disabled = false;
-  }
-}
-
-/** First tap arms the button, second tap deletes. */
-async function deleteIngredient() {
-  const del = document.getElementById("ingredient-delete");
-  if (!del.dataset.armed) {
-    del.dataset.armed = "1";
-    del.textContent = "Really delete?";
-    return;
-  }
-  try {
-    await catalog.deleteIngredient(editingIngredient.id);
-    document.getElementById("ingredient-dialog").close();
-  } catch (err) {
-    resetDeleteButton("ingredient-delete");
-    showDialogError(err.message, "ingredient-error");
-  }
-}
-
 export function initStation() {
   document
     .getElementById("add-ingredient-btn")
-    .addEventListener("click", () => openIngredientDialog());
-  document.getElementById("ingredient-form").addEventListener("submit", saveIngredient);
-  document.getElementById("ingredient-delete").addEventListener("click", deleteIngredient);
-  document
-    .getElementById("ingredient-cancel")
-    .addEventListener("click", () => document.getElementById("ingredient-dialog").close());
+    .addEventListener("click", () => openAddIngredient({ station: catalog.currentStation() }));
   // A tap outside an open ⋯ menu (or Escape) closes it.
   document.addEventListener("click", (event) => {
     if (openMenu && !event.target.closest(".row-menu, .row-more")) closeRowMenu();
