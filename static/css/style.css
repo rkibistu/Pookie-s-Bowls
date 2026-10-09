@@ -912,12 +912,91 @@ body.selecting .ingredient-row.unpickable::after {
 /* ---- Recipes ---------------------------------------------------------- */
 .filter-panel {
     display: grid;
-    gap: 12px;
+    gap: 10px;
     margin-bottom: 16px;
-    padding: 14px 16px;
+}
+
+/* Ingredient search and category dropdown, side by side on one row. */
+.filter-row {
+    display: flex;
+    gap: 8px;
+}
+
+.filter-row .filter-search {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 16px text: smaller makes iPhones zoom in when typing. */
+.filter-panel .filter-search input {
+    height: 36px;
+    padding: 0 10px;
     background: var(--surface);
-    border-radius: var(--radius);
+}
+
+/* Categories: a dropdown of ticks, so several can be chosen at once. */
+.category-picker {
+    position: relative;
+    flex: none;
+    max-width: 45%;
+}
+
+.filter-category {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    height: 36px;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border: 2px solid var(--accent-soft);
+    border-radius: 10px;
+    outline: none;
+    cursor: pointer;
+}
+
+.filter-category:focus-visible {
+    border-color: var(--accent);
+}
+
+.category-picker-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 10;
+    min-width: 200px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 4px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 10px;
     box-shadow: var(--shadow);
+}
+
+.category-picker-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.category-picker-option:hover {
+    background: var(--accent-soft);
+}
+
+.category-picker-option input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
 }
 
 .filter-search {
@@ -968,7 +1047,7 @@ body.selecting .ingredient-row.unpickable::after {
 .filter-footer {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .filter-footer:not(:has(li, button:not([hidden]))) {
@@ -977,13 +1056,32 @@ body.selecting .ingredient-row.unpickable::after {
 
 .filter-picks {
     flex: 1;
+    gap: 4px;
     margin: 0;
 }
 
 .filter-count {
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: 0.75rem;
     white-space: nowrap;
+}
+
+/* The filter's ingredient chips and Clear: small, it's just a reminder. */
+.filter-picks .build-pick {
+    gap: 2px;
+    padding: 2px 2px 2px 8px;
+    font-size: 0.75rem;
+}
+
+.filter-picks .build-pick-remove {
+    width: 18px;
+    height: 18px;
+    font-size: 0.6rem;
+}
+
+.filter-footer .secondary-btn {
+    padding: 3px 10px;
+    font-size: 0.75rem;
 }
 
 #recipe-list {

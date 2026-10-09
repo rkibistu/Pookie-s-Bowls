@@ -65,11 +65,18 @@
             </div>
             <p class="load-error" id="recipes-error" hidden></p>
             <section class="filter-panel" id="recipe-filter" aria-label="Filter recipes" hidden>
-                <div class="chips" id="recipe-filter-categories"></div>
-                <div class="filter-search">
-                    <input type="text" id="recipe-filter-input" autocomplete="off"
-                           placeholder="🔍 Filter by ingredient…" aria-label="Filter by ingredient">
-                    <ul class="filter-suggestions" id="recipe-filter-suggestions" hidden></ul>
+                <div class="filter-row">
+                    <div class="filter-search">
+                        <input type="text" id="recipe-filter-input" autocomplete="off"
+                               placeholder="🔍 Ingredient…" aria-label="Filter by ingredient">
+                        <ul class="filter-suggestions" id="recipe-filter-suggestions" hidden></ul>
+                    </div>
+                    <div class="category-picker">
+                        <button type="button" class="filter-category" id="recipe-filter-category-btn"
+                                aria-expanded="false" aria-controls="recipe-filter-categories"
+                                aria-label="Filter by category"></button>
+                        <div class="category-picker-list" id="recipe-filter-categories" hidden></div>
+                    </div>
                 </div>
                 <div class="filter-footer">
                     <ul class="build-picks filter-picks" id="recipe-filter-picks"></ul>

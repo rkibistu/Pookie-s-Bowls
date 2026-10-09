@@ -1,8 +1,8 @@
 // The Recipes view: one card per recipe, newest first, narrowed by the
-// filter panel (categories and the items a recipe contains).
+// filter (categories and the items a recipe contains).
 
 import { catalog } from "./catalog.js";
-import { checkedChipIds, el, pickChip, renderChips } from "./dom.js";
+import { el, pickChip } from "./dom.js";
 import { initItemSearch } from "./item-search.js";
 import { itemKey, itemLabel } from "./items.js";
 import { openRecipe } from "./recipe-dialog.js";
@@ -10,7 +10,7 @@ import { categoryChipOptions, recipeEmoji } from "./recipe-categories.js";
 
 const CARD_CHIPS = 6; // component chips shown on a card before "+N"
 
-/** After the catalog reloads: its error, if any, the filter's chips and the list. */
+/** After the catalog reloads: its error, if any, the filter's categories and the list. */
 function catalogChanged() {
   const errorBox = document.getElementById("recipes-error");
   errorBox.textContent = catalog.loadError() || "";
@@ -90,8 +90,38 @@ function matchesFilter(recipe) {
   return [...items.keys()].every((key) => keys.has(key));
 }
 
+/** The category dropdown's ticks; deleted categories drop out of the filter. */
 function renderFilterCategories() {
-  renderChips("recipe-filter-categories", categoryChipOptions(), recipeFilter.categoryIds);
+  const options = categoryChipOptions();
+  const ids = new Set(options.map((o) => o.id));
+  for (const id of recipeFilter.categoryIds) if (!ids.has(id)) recipeFilter.categoryIds.delete(id);
+
+  const list = document.getElementById("recipe-filter-categories");
+  list.replaceChildren();
+  for (const option of options) {
+    const label = el("label", "category-picker-option");
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.value = option.id;
+    box.checked = recipeFilter.categoryIds.has(option.id);
+    label.append(box, el("span", null, option.name));
+    list.append(label);
+  }
+  renderCategoryButton();
+}
+
+/** "🏷️ All", the one category ticked, or "🏷️ 2 categories". */
+function renderCategoryButton() {
+  const ticked = categoryChipOptions().filter((o) => recipeFilter.categoryIds.has(o.id));
+  document.getElementById("recipe-filter-category-btn").textContent =
+    ticked.length === 0 ? "🏷️ All ▾"
+    : ticked.length === 1 ? `${ticked[0].name} ▾`
+    : `🏷️ ${ticked.length} categories ▾`;
+}
+
+function setCategoryListOpen(open) {
+  document.getElementById("recipe-filter-categories").hidden = !open;
+  document.getElementById("recipe-filter-category-btn").setAttribute("aria-expanded", String(open));
 }
 
 /** Picked-item chips, the "3 of 12" count and Clear, after the list changes. */
@@ -132,10 +162,23 @@ export function initRecipes() {
       renderRecipes();
     },
   );
-  document.getElementById("recipe-filter-categories").addEventListener("change", () => {
-    recipeFilter.categoryIds.clear();
-    for (const id of checkedChipIds("recipe-filter-categories")) recipeFilter.categoryIds.add(id);
+  // The dropdown stays open while ticking; a tap outside it or Escape closes it.
+  const categoryList = document.getElementById("recipe-filter-categories");
+  document.getElementById("recipe-filter-category-btn").addEventListener("click", () => {
+    setCategoryListOpen(categoryList.hidden);
+  });
+  categoryList.addEventListener("change", (event) => {
+    const id = Number(event.target.value);
+    if (event.target.checked) recipeFilter.categoryIds.add(id);
+    else recipeFilter.categoryIds.delete(id);
+    renderCategoryButton();
     renderRecipes();
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".category-picker")) setCategoryListOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setCategoryListOpen(false);
   });
   document.getElementById("recipe-filter-clear").addEventListener("click", clearFilter);
 }
