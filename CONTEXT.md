@@ -4,6 +4,16 @@ A shared recipe book for two people: an ingredient catalog, recipes built from t
 
 ## Language
 
+### The catalog
+
+**Ingredient**:
+A base item in the catalog, such as salmon or rice. It is never a recipe: a sauce is a recipe, even though it is shown and picked like an ingredient. Its name is unique ignoring case.
+_Avoid_: item (that also covers listed recipes)
+
+**Ingredient category**:
+One of the fixed groups an ingredient is shown in on the Ingredients page (Protein, Base…). An ingredient is in at least one, and can be in several.
+_Avoid_: section, kind
+
 ### Building recipes
 
 **Listed recipe**:

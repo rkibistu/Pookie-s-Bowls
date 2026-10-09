@@ -94,7 +94,8 @@ export function createCatalog({ api }) {
     changeRecipe: (id, fields) => save("PATCH", `/api/recipes/${id}`, fields),
     deleteRecipe: (id) => save("DELETE", `/api/recipes/${id}`),
     createIngredient: (fields) => save("POST", "/api/ingredients", fields),
-    changeIngredient: (id, fields) => save("PUT", `/api/ingredients/${id}`, fields),
+    /** Change only the fields given; resolves to the saved ingredient. */
+    changeIngredient: (id, fields) => save("PATCH", `/api/ingredients/${id}`, fields),
     deleteIngredient: (id) => save("DELETE", `/api/ingredients/${id}`),
     /** Add (on) or remove a person's heart on an ingredient or recipe item. */
     setFavorite: (item, person, on) =>

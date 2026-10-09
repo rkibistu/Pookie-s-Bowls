@@ -1,6 +1,7 @@
 import pytest
 
 import recipes
+from errors import INVALID, NOT_FOUND, RuleError
 
 
 def test_a_new_recipe_comes_back_with_its_categories_and_components_in_pick_order(
@@ -64,9 +65,9 @@ def test_a_recipe_cannot_end_up_inside_itself(conn, category):
     )
 
     for recipe, inside in [(mayo, mayo), (mayo, bowl)]:
-        with pytest.raises(recipes.RecipeError) as err:
+        with pytest.raises(RuleError) as err:
             recipes.change(conn, recipe["id"], {"components": [{"type": "recipe", "id": inside["id"]}]})
-        assert err.value.kind == recipes.INVALID
+        assert err.value.kind == INVALID
         assert err.value.message == "A recipe can't go inside itself."
     assert recipes.get(conn, mayo["id"])["components"] == []
 
@@ -84,10 +85,10 @@ def test_a_recipe_cannot_end_up_inside_itself(conn, category):
     ],
 )
 def test_a_new_recipe_is_refused_when_a_field_is_wrong(conn, category, fields, message):
-    with pytest.raises(recipes.RecipeError) as err:
+    with pytest.raises(RuleError) as err:
         recipes.create(conn, {"name": "Salmon bowl", "category_ids": [category("bowl")], **fields})
 
-    assert (err.value.kind, err.value.message) == (recipes.INVALID, message)
+    assert (err.value.kind, err.value.message) == (INVALID, message)
 
 
 def test_a_link_without_a_scheme_becomes_https(conn, category):
@@ -100,9 +101,9 @@ def test_a_link_without_a_scheme_becomes_https(conn, category):
 
 def test_a_missing_recipe_is_not_found(conn):
     for attempt in (lambda: recipes.get(conn, 42), lambda: recipes.change(conn, 42, {"notes": "x"})):
-        with pytest.raises(recipes.RecipeError) as err:
+        with pytest.raises(RuleError) as err:
             attempt()
-        assert err.value.kind == recipes.NOT_FOUND
+        assert err.value.kind == NOT_FOUND
 
 
 def test_deleting_a_sauce_takes_it_out_of_the_bowls_that_had_it(conn, category):
@@ -120,9 +121,9 @@ def test_deleting_a_sauce_takes_it_out_of_the_bowls_that_had_it(conn, category):
 
     assert recipes.get(conn, bowl["id"])["components"] == []
     assert [r["name"] for r in recipes.list_all(conn)] == ["Salmon bowl"]
-    with pytest.raises(recipes.RecipeError) as err:
+    with pytest.raises(RuleError) as err:
         recipes.delete(conn, mayo["id"])
-    assert err.value.kind == recipes.NOT_FOUND
+    assert err.value.kind == NOT_FOUND
 
 
 def test_the_list_shows_the_newest_recipe_first(conn, category):
@@ -130,3 +131,14 @@ def test_the_list_shows_the_newest_recipe_first(conn, category):
         recipes.create(conn, {"name": name, "category_ids": [category("bowl")]})
 
     assert [r["name"] for r in recipes.list_all(conn)] == ["Miso soup", "Salmon bowl", "Spicy mayo"]
+
+
+def test_only_listed_recipes_get_a_card_on_the_ingredients_page(conn, category):
+    recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("sauce")]})
+    recipes.create(conn, {"name": "Salmon bowl", "category_ids": [category("bowl")]})
+
+    sections = recipes.listed_sections(conn)
+
+    assert [(s["slug"], [r["name"] for r in s["recipes"]]) for s in sections] == [
+        ("sauce", ["Spicy mayo"])
+    ]

@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["DB_PATH"] = os.path.join(tempfile.mkdtemp(), "test.db")
 
 import db  # noqa: E402
+import ingredients  # noqa: E402
 
 
 @pytest.fixture
@@ -32,9 +33,10 @@ def category(conn):
 def ingredient(conn):
     """Add an ingredient to the catalog; returns its id."""
 
-    def add(name):
-        with conn:
-            cur = conn.execute("INSERT INTO ingredients (name) VALUES (?)", (name,))
-        return cur.lastrowid
+    def add(name, category="protein"):
+        category_id = conn.execute(
+            "SELECT id FROM categories WHERE slug = ?", (category,)
+        ).fetchone()[0]
+        return ingredients.create(conn, {"name": name, "category_ids": [category_id]})["id"]
 
     return add

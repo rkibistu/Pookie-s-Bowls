@@ -1,7 +1,7 @@
 """Recipes: what a recipe may hold, and reading and writing them.
 
 Every function takes the database connection to work on and returns plain
-dicts; a broken rule raises RecipeError. Nothing here knows about HTTP.
+dicts; a broken rule raises RuleError. Nothing here knows about HTTP.
 
 A recipe's components are items, {type: "ingredient" | "recipe", id}, in
 pick order. Any recipe can go inside another, as long as that doesn't make a
@@ -11,19 +11,9 @@ business).
 
 from urllib.parse import urlsplit
 
-INVALID = "invalid"
-NOT_FOUND = "not_found"
+from errors import NOT_FOUND, RuleError
 
 FIELDS = ("name", "url", "notes", "category_ids", "components")
-
-
-class RecipeError(Exception):
-    """A rule a recipe change broke; kind is INVALID or NOT_FOUND."""
-
-    def __init__(self, message, kind=INVALID):
-        super().__init__(message)
-        self.message = message
-        self.kind = kind
 
 
 # ---- Reading -------------------------------------------------------------
@@ -63,20 +53,44 @@ def list_all(conn):
     ]
 
 
+def listed_sections(conn):
+    """The listed recipe categories (e.g. sauces) in display order, each with
+    its recipes A→Z: the recipe cards on the Ingredients page."""
+    sections = [
+        {**dict(r), "recipes": []}
+        for r in conn.execute(
+            "SELECT id, slug, name, emoji FROM recipe_categories "
+            "WHERE in_ingredient_list = 1 ORDER BY position, id"
+        )
+    ]
+    by_id = {s["id"]: s for s in sections}
+    favorites = favorites_by(conn, "recipe_id")
+    for r in conn.execute(
+        "SELECT l.category_id, r.id, r.name FROM recipe_category_links l "
+        "JOIN recipes r ON r.id = l.recipe_id "
+        "ORDER BY r.name COLLATE NOCASE"
+    ):
+        if r["category_id"] in by_id:
+            by_id[r["category_id"]]["recipes"].append(
+                {"id": r["id"], "name": r["name"], "favorites": favorites.get(r["id"], [])}
+            )
+    return sections
+
+
 def _row(conn, recipe_id):
     row = conn.execute(
         "SELECT id, name, url, notes, created_at FROM recipes WHERE id = ?",
         (recipe_id,),
     ).fetchone()
     if row is None:
-        raise RecipeError("Recipe not found.", NOT_FOUND)
+        raise RuleError("Recipe not found.", NOT_FOUND)
     return row
 
 
 def favorites_by(conn, column):
     """Who has favorited each item, "me" before "her": {item id: [person]}.
 
-    column is "ingredient_id" or "recipe_id"; the ingredient list uses it too.
+    column is "ingredient_id" or "recipe_id"; ingredients.py uses it too.
     """
     favorites = {}
     for r in conn.execute(
@@ -132,7 +146,7 @@ def _components(conn, recipe_id=None):
 def create(conn, fields):
     """Save a new recipe; name and category_ids are required."""
     if not isinstance(fields, dict):
-        raise RecipeError("Expected a JSON object.")
+        raise RuleError("Expected a JSON object.")
     recipe = _parse(conn, {k: fields.get(k) for k in FIELDS})
     with conn:
         cur = conn.execute(
@@ -148,7 +162,7 @@ def change(conn, recipe_id, fields):
     """Change only the fields given (e.g. just notes); the rest stays as stored."""
     _row(conn, recipe_id)  # not found?
     if not isinstance(fields, dict):
-        raise RecipeError("Expected a JSON object.")
+        raise RuleError("Expected a JSON object.")
     recipe = _parse(conn, {k: v for k, v in fields.items() if k in FIELDS}, recipe_id)
     own = {k: recipe[k] for k in ("name", "url", "notes") if k in recipe}
     with conn:
@@ -183,28 +197,28 @@ def _is_id(value):
 def _parse_name(name):
     name = name.strip() if isinstance(name, str) else ""
     if not name:
-        raise RecipeError("Please give the recipe a name.")
+        raise RuleError("Please give the recipe a name.")
     return name
 
 
 def _parse_notes(notes):
     """Optional notes; blank becomes None."""
     if notes is not None and not isinstance(notes, str):
-        raise RecipeError("notes must be text.")
+        raise RuleError("notes must be text.")
     return (notes or "").strip() or None
 
 
 def _parse_url(url):
     """The optional link as http(s), or None if blank."""
     if url is not None and not isinstance(url, str):
-        raise RecipeError("url must be text.")
+        raise RuleError("url must be text.")
     url = (url or "").strip()
     if not url:
         return None
     if "://" not in url:
         url = "https://" + url  # "example.com/poke" → https://example.com/poke
     # Only http(s) is accepted, so the URL is always safe to use as an href.
-    invalid = RecipeError("Please enter a valid link (http/https).")
+    invalid = RuleError("Please enter a valid link (http/https).")
     if any(c.isspace() for c in url):
         raise invalid
     try:
@@ -220,12 +234,12 @@ def _parse_url(url):
 def _parse_category_ids(conn, category_ids):
     """Known recipe category ids, sorted and unique; at least one."""
     if not isinstance(category_ids, list) or not all(map(_is_id, category_ids)):
-        raise RecipeError("category_ids must be a list of category ids.")
+        raise RuleError("category_ids must be a list of category ids.")
     category_ids = sorted(set(category_ids))
     if not category_ids:
-        raise RecipeError("Pick at least one category.")
+        raise RuleError("Pick at least one category.")
     if _count_known(conn, "recipe_categories", category_ids) != len(category_ids):
-        raise RecipeError("Unknown category.")
+        raise RuleError("Unknown category.")
     return category_ids
 
 
@@ -236,7 +250,7 @@ def _parse_components(conn, components, recipe_id):
     """
     if components is None:
         return []
-    invalid = RecipeError("components must be a list of {type, id} items.")
+    invalid = RuleError("components must be a list of {type, id} items.")
     if not isinstance(components, list):
         raise invalid
     parsed = []
@@ -250,12 +264,12 @@ def _parse_components(conn, components, recipe_id):
 
     ingredient_ids = [i for t, i in parsed if t == "ingredient"]
     if _count_known(conn, "ingredients", ingredient_ids) != len(ingredient_ids):
-        raise RecipeError("Unknown ingredient.")
+        raise RuleError("Unknown ingredient.")
     recipe_ids = [i for t, i in parsed if t == "recipe"]
     if _count_known(conn, "recipes", recipe_ids) != len(recipe_ids):
-        raise RecipeError("Unknown recipe.")
+        raise RuleError("Unknown recipe.")
     if recipe_id is not None and recipe_id in _inside(conn, recipe_ids):
-        raise RecipeError("A recipe can't go inside itself.")
+        raise RuleError("A recipe can't go inside itself.")
     return parsed
 
 
@@ -313,4 +327,4 @@ def delete(conn, recipe_id):
     with conn:
         cur = conn.execute("DELETE FROM recipes WHERE id = ?", (recipe_id,))
     if cur.rowcount == 0:
-        raise RecipeError("Recipe not found.", NOT_FOUND)
+        raise RuleError("Recipe not found.", NOT_FOUND)
