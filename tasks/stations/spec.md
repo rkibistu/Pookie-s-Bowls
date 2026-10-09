@@ -20,7 +20,7 @@ Terms are in `CONTEXT.md`: **Station**, **Section**, **Ingredient section**, **L
 - Stations are listed in creation order. Reordering stations is out of scope.
 
 ### Screens
-- **Nav:** one button per station, then 📖 Recipes, then 🧺 All ingredients, which is always last. The row scrolls sideways if it overflows. The app remembers the last station you used.
+- **Nav:** 📖 Recipes first, then one button per station, then 🧺 All ingredients, then ＋ New station. The row scrolls sideways if it overflows. The app remembers the last station you used.
 - **On a station:**
   - **✏️ Station** (it replaces ✏️ Sections) opens a dialog for the station you're on:
     - its name and emoji
@@ -29,7 +29,7 @@ Terms are in `CONTEXT.md`: **Station**, **Section**, **Ingredient section**, **L
       - ingredient sections: add, rename, delete
       - recipe categories: tick to list or untick to unlist, as in the Sections dialog today
     - deleting the station
-  - **＋ New station** is the very last button in the nav, after 🧺 All ingredients. A new station starts with no sections.
+  - **＋ New station** is the very last button in the nav. A new station starts with no sections.
 - **Adding ingredients:**
   - The toolbar's **+ Add ingredient** button stays. Typing suggests existing ingredients, as the recipe dialog's "+ Add ingredient…" box does, and you tick which of this station's ingredient sections it goes in (none is allowed).
   - Each ingredient section's header gets a **"+"** that does the same, straight into that section.
