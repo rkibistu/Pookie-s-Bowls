@@ -107,7 +107,13 @@
             <p class="load-error" id="all-error" hidden></p>
             <section class="category-card" id="all-ingredients"></section>
         </section>
+
     </main>
+
+    <!-- Laptops only, once scrolled to the bottom (backup.js). To restore, copy
+         the file to data/pookie.db on the prod laptop while the app is stopped. -->
+    <a class="backup-fab" id="backup-fab" href="/backup" download
+       title="Download a backup" aria-label="Download a backup">💾</a>
 
     <dialog class="dialog" id="ingredient-dialog">
         <form id="ingredient-form" novalidate>

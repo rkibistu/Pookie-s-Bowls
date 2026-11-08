@@ -177,6 +177,46 @@ body {
     color: var(--muted);
 }
 
+/* ---- Backup button: bottom right, laptops only, once scrolled down ------ */
+
+.backup-fab {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 48px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    font-size: 1.4rem;
+    text-decoration: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.backup-fab.shown {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* The pick tray takes the bottom of the screen. */
+body.selecting .backup-fab {
+    display: none;
+}
+
+.backup-fab:hover {
+    filter: brightness(0.95);
+}
+
+@media (max-width: 640px) {
+    .backup-fab {
+        display: none;
+    }
+}
+
 /* ---- Buttons ---------------------------------------------------------- */
 .primary-btn,
 .secondary-btn,

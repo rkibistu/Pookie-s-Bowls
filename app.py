@@ -1,8 +1,9 @@
 """Pookie's Bowls — Flask app entry point."""
 
 import os
+from datetime import date
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 import db
 import errors
@@ -32,6 +33,16 @@ def handle_rule_error(err):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.get("/backup")
+def download_backup():
+    """A snapshot of the whole database, saved by whichever device asked for it."""
+    return Response(
+        db.snapshot(db.get_db()),
+        mimetype="application/vnd.sqlite3",
+        headers={"Content-Disposition": f"attachment; filename=pookies-bowls-{date.today()}.db"},
+    )
 
 
 # ---- Ingredients ---------------------------------------------------------

@@ -208,6 +208,16 @@ def _contents_of(path):
         conn.close()
 
 
+def snapshot(conn):
+    """The whole database as the bytes of a .db file, consistent even while it's in use."""
+    copy = sqlite3.connect(":memory:")
+    try:
+        conn.backup(copy)
+        return copy.serialize()
+    finally:
+        copy.close()
+
+
 def _log(message):
     print(f"[db] {message}", file=sys.stderr, flush=True)
 

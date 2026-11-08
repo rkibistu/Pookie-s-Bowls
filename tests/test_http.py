@@ -1,8 +1,11 @@
 """Smoke tests: the recipe routes reach recipes.py and speak HTTP."""
 
+from datetime import date
+
 import pytest
 
 import app as app_module
+import db
 
 
 @pytest.fixture
@@ -156,3 +159,17 @@ def test_a_station_can_be_created_and_deleted_over_http(client):
     assert client.delete(f"/api/stations/{burger}").status_code == 404
     [poke] = client.get("/api/stations").json["stations"]
     assert client.delete(f"/api/stations/{poke['id']}").status_code == 400
+
+
+def test_a_backup_downloads_the_whole_database_as_a_file(client, tmp_path):
+    client.post("/api/stations", json={"name": "Burger", "emoji": "🍔"})
+
+    downloaded = client.get("/backup")
+
+    assert downloaded.status_code == 200
+    assert downloaded.headers["Content-Disposition"] == f"attachment; filename=pookies-bowls-{date.today()}.db"
+    saved = tmp_path / "pookies-bowls.db"
+    saved.write_bytes(downloaded.data)
+    conn = db.get_connection(saved)
+    assert db.version(conn) == len(db.migrations())
+    assert [r[0] for r in conn.execute("SELECT name FROM stations ORDER BY id")] == ["Poke", "Burger"]

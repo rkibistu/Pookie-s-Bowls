@@ -45,7 +45,7 @@ The logs show `[db] Applying migration …` for each new migration and where the
 
 ### Rehearse a migration (before deploying it)
 
-1. Download a backup from prod's backup page.
+1. Download a backup from prod: on a laptop, scroll to the bottom of any page and click 💾 in the bottom-right corner. To restore one on prod, stop the app and copy it to `data/pookie.db`.
 2. On the dev machine, stop dev, copy the file over `data/pookie.db`, and start dev with the new code (`docker compose up --build`).
 3. Check the logs show the migration applied, and look through the app: stations, recipes, favorites.
 

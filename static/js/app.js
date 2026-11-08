@@ -1,6 +1,7 @@
 // Pookie's Bowls — entry point: wires every view once the page has loaded.
 
 import { initAllIngredients } from "./all-ingredients.js";
+import { initBackupButton } from "./backup.js";
 import { initCategoriesDialog } from "./categories-dialog.js";
 import { catalog } from "./catalog.js";
 import { initEmojiPicker } from "./emoji-picker.js";
@@ -25,6 +26,7 @@ function init() {
   initStationDialog();
   initAllIngredients();
   initEmojiPicker();
+  initBackupButton();
   catalog.reload();
 }
 

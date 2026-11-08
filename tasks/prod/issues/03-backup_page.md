@@ -1,6 +1,6 @@
 # Backup page
 
-Status: ready-for-agent
+Status: done
 
 Blocked by: 01
 
@@ -14,3 +14,7 @@ See `../spec.md`. This must be done before any migration after the baseline goes
 ## Done when
 
 - The downloaded file opens as a working database: dropped into dev's `data/pookie.db`, dev shows the same stations, recipes and favorites.
+
+## Comments
+
+- Done. Not a page in the end: a 💾 button in the bottom-right corner, laptops only, shown once the page is scrolled to the bottom (or has nothing to scroll), hidden while picking. It downloads `/backup` (`db.snapshot`: SQLite's backup API into memory, then its bytes). How to restore is in its comment in `index.html` and in the README. Checked from a prod container: the downloaded file, opened by dev, shows prod's stations and ingredients and isn't reseeded.
