@@ -55,7 +55,14 @@ function renderStation() {
   const container = document.getElementById("station-sections");
   container.replaceChildren();
   const station = catalog.currentStation();
-  if (!station) return;
+  // The toolbar acts on the station shown, so there's none without one.
+  document.querySelector("#view-station .toolbar").hidden = !station;
+  if (!station) {
+    if (!catalog.loadError()) {
+      container.append(el("p", "placeholder", "No stations yet — create one with ＋ New station"));
+    }
+    return;
+  }
   if (station.sections.length === 0) {
     container.append(el("p", "placeholder", "No sections yet — add some with ✏️ Station"));
   }

@@ -36,6 +36,10 @@ function renderRecipes() {
   const shown = recipes.filter(matchesFilter);
   renderFilterState(shown.length);
 
+  if (catalog.recipeCategories().length === 0) {
+    container.append(el("p", "placeholder", "No recipe categories yet — add one with 🏷️ Categories"));
+    return;
+  }
   if (recipes.length === 0) {
     container.append(el("p", "placeholder", "No recipes yet — tap + New recipe 🥣"));
     return;

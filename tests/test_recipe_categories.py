@@ -1,6 +1,5 @@
 import pytest
 
-import db
 import recipe_categories
 import recipes
 from errors import DUPLICATE, INVALID, NOT_FOUND, RuleError
@@ -175,11 +174,3 @@ def test_deleting_a_missing_category_says_so(conn):
         NOT_FOUND,
         "Category not found.",
     )
-
-
-def test_a_deleted_seed_category_stays_deleted_after_a_restart(conn, category):
-    recipe_categories.delete(conn, category("Soup"))
-
-    db.set_up(conn)
-
-    assert names(conn) == ["Poke bowl", "Sauce"]

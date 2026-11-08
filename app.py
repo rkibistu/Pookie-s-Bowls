@@ -15,7 +15,7 @@ import stations
 app = Flask(__name__)
 app.teardown_appcontext(db.close_db)
 
-# Ensure the database and seed data exist before serving any request.
+# Bring the database up to date (or refuse to start) before serving any request.
 db.init_db()
 
 # The rules live in ingredients.py, recipes.py, recipe_categories.py and

@@ -11,4 +11,6 @@ services:
     environment:
       - DB_PATH=/data/pookie.db
       - FLASK_DEBUG=1
+      # Fill a brand-new dev database with the Poke station (never in prod).
+      - SEED=1
     restart: unless-stopped
