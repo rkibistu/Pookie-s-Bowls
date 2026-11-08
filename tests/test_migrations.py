@@ -138,6 +138,18 @@ def test_only_the_newest_copies_are_kept(tmp_path, database_at):
     assert not (tmp_path / "pre-0001-20200100.db").exists()
 
 
+def test_restarting_on_a_failing_migration_copies_the_database_only_once(tmp_path, database_at):
+    conn = database_at(LATEST)
+    first = db.backup(conn, tmp_path, LATEST + 1)
+
+    assert db.backup(conn, tmp_path, LATEST + 1) == first
+
+    conn.execute("DELETE FROM favorites")
+    conn.commit()
+    assert db.backup(conn, tmp_path, LATEST + 1) != first
+    assert len(list(tmp_path.glob("pre-*.db"))) == 2
+
+
 def test_a_python_migration_gets_the_connection(migrations_dir, database_at):
     conn = database_at(LATEST)
     (migrations_dir / f"{LATEST + 1:04d}_shout_names.py").write_text(

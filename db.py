@@ -164,19 +164,48 @@ def _load(path):
 
 
 def backup(conn, backup_dir, first_pending):
-    """Copy the database to backup_dir/pre-NNNN-<time>.db, keeping the newest BACKUPS_KEPT."""
+    """Copy the database to backup_dir/pre-NNNN-<time>.db, keeping the newest BACKUPS_KEPT.
+
+    If the newest copy already holds exactly this data (the app is being
+    restarted over and over on a migration that fails), that copy is kept
+    instead of pushing the older ones out with duplicates.
+    """
     backup_dir = Path(backup_dir)
     backup_dir.mkdir(parents=True, exist_ok=True)
-    target = backup_dir / f"pre-{first_pending:04d}-{datetime.now():%Y%m%d-%H%M%S}.db"
+    copies = sorted(backup_dir.glob("pre-*.db"), key=lambda p: p.stat().st_mtime)
+    if copies and _contents(conn) == _contents_of(copies[-1]):
+        _log(f"The database is unchanged since {copies[-1]}; not copying it again")
+        return copies[-1]
+    stem = f"pre-{first_pending:04d}-{datetime.now():%Y%m%d-%H%M%S}"
+    target = backup_dir / f"{stem}.db"
+    n = 1
+    while target.exists():  # two copies within a second
+        n += 1
+        target = backup_dir / f"{stem}-{n}.db"
     copy = sqlite3.connect(target)
     try:
         conn.backup(copy)
     finally:
         copy.close()
     _log(f"Copied the database to {target}")
-    for old in sorted(backup_dir.glob("pre-*.db"), key=lambda p: p.stat().st_mtime)[:-BACKUPS_KEPT]:
+    for old in (copies + [target])[:-BACKUPS_KEPT]:
         old.unlink()
     return target
+
+
+def _contents(conn):
+    """Everything the database holds, as its version and SQL dump."""
+    return version(conn), list(conn.iterdump())
+
+
+def _contents_of(path):
+    conn = sqlite3.connect(path)
+    try:
+        return _contents(conn)
+    except sqlite3.DatabaseError:
+        return None  # not a readable database: it doesn't count as a copy
+    finally:
+        conn.close()
 
 
 def _log(message):
