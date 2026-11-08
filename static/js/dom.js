@@ -37,11 +37,25 @@ export function showDialogError(message, boxId) {
   box.hidden = !message;
 }
 
+/**
+ * Arm a two-tap Delete button: "Really delete?", and above it what else
+ * goes (see delete-warnings.js), if anything.
+ */
+export function armDeleteButton(id, warning) {
+  const del = document.getElementById(id);
+  del.dataset.armed = "1";
+  del.textContent = "Really delete?";
+  const box = document.getElementById(`${id}-warning`);
+  box.textContent = warning || "";
+  box.hidden = !warning;
+}
+
 /** Disarm a two-tap Delete button (see deleteIngredient, deleteRecipe). */
 export function resetDeleteButton(id) {
   const del = document.getElementById(id);
   delete del.dataset.armed;
   del.textContent = "Delete";
+  document.getElementById(`${id}-warning`).hidden = true;
 }
 
 /** A removable chip: the label and a ✕ that calls onRemove. */

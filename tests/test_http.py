@@ -158,7 +158,8 @@ def test_a_station_can_be_created_and_deleted_over_http(client):
     assert client.delete(f"/api/stations/{burger}").status_code == 204
     assert client.delete(f"/api/stations/{burger}").status_code == 404
     [poke] = client.get("/api/stations").json["stations"]
-    assert client.delete(f"/api/stations/{poke['id']}").status_code == 400
+    assert client.delete(f"/api/stations/{poke['id']}").status_code == 204
+    assert client.get("/api/stations").json["stations"] == []
 
 
 def test_a_backup_downloads_the_whole_database_as_a_file(client, tmp_path):

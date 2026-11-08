@@ -6,7 +6,7 @@
 // Also the New station dialog, and deleting a station.
 
 import { catalog } from "./catalog.js";
-import { el, resetDeleteButton, showDialogError, showToast } from "./dom.js";
+import { armDeleteButton, el, resetDeleteButton, showDialogError, showToast } from "./dom.js";
 import { attachEmojiPicker } from "./emoji-picker.js";
 import { showStation } from "./station.js";
 
@@ -29,7 +29,6 @@ function render() {
   renderRecipeCategorySelect(station);
   renderIngredientSectionRows(station);
   renderCategoryRows(station);
-  document.getElementById("station-delete").hidden = catalog.stations().length < 2;
 
   if (focused) document.querySelector(`#station-dialog [data-focus-key="${focused}"]`)?.focus();
 }
@@ -247,12 +246,10 @@ function closeStartCategoryRow() {
   form.hidden = true;
 }
 
-/** First tap arms the button, second tap deletes; the last station can't go. */
+/** First tap arms the button, second tap deletes; its ingredients stay in the catalog. */
 async function deleteStation() {
-  const del = document.getElementById("station-delete");
-  if (!del.dataset.armed) {
-    del.dataset.armed = "1";
-    del.textContent = "Really delete?";
+  if (!document.getElementById("station-delete").dataset.armed) {
+    armDeleteButton("station-delete", null);
     return;
   }
   const station = catalog.currentStation();

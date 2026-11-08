@@ -3,6 +3,7 @@
 // move ↑/↓, delete, and add new ones. Each change saves as soon as it's made.
 
 import { catalog } from "./catalog.js";
+import { categoryWarning } from "./delete-warnings.js";
 import { el, showDialogError } from "./dom.js";
 import { attachEmojiPicker } from "./emoji-picker.js";
 
@@ -27,6 +28,8 @@ function renderRows() {
       deleteButton(category),
     );
     list.append(row);
+    const warning = armedId === category.id && categoryWarning(catalog.stations(), category.id);
+    if (warning) list.append(el("li", "delete-warning", warning));
   });
   if (focused) list.querySelector(`[data-focus-key="${focused}"]`)?.focus();
 }
@@ -76,7 +79,7 @@ function quantitiesButton(category) {
   return btn;
 }
 
-/** First tap arms the 🗑, second tap deletes. */
+/** First tap arms the 🗑 (saying which stations use it), second tap deletes. */
 function deleteButton(category) {
   const armed = armedId === category.id;
   const btn = rowButton(armed ? "Delete?" : "🗑", `Delete ${category.name}`, false, () => {

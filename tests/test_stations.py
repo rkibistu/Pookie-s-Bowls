@@ -284,11 +284,17 @@ def test_deleting_a_station_leaves_its_ingredients_as_orphans(conn, poke, ingred
     assert ingredients.get(conn, salmon)["section_ids"] != []
 
 
-def test_the_last_station_cannot_be_deleted(conn, poke):
-    assert refused(lambda: stations.delete(conn, poke)) == (
-        INVALID,
-        "The last station can't be deleted; rename it instead.",
-    )
+def test_the_last_station_can_be_deleted_too(conn, poke, ingredient):
+    """Prod starts with none, so having none is fine; its ingredients stay."""
+    salmon = ingredient("Salmon")
+
+    stations.delete(conn, poke)
+
+    assert stations.list_all(conn) == []
+    assert ingredients.get(conn, salmon)["section_ids"] == []
+
+
+def test_deleting_a_missing_station_says_so(conn):
     assert refused(lambda: stations.delete(conn, 99)) == (NOT_FOUND, "Station not found.")
 
 

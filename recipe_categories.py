@@ -113,11 +113,9 @@ def reorder(conn, category_ids):
 def delete(conn, category_id):
     """Delete a category; recipes also in another one just lose it.
 
-    Refused for the last category, and while some recipe has no other one.
+    Refused while some recipe has no other one.
     """
     get(conn, category_id)  # not found?
-    if conn.execute("SELECT COUNT(*) FROM recipe_categories").fetchone()[0] == 1:
-        raise RuleError("The last category can't be deleted; rename it instead.")
     stranded = [
         r["name"]
         for r in conn.execute(

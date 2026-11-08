@@ -4,7 +4,15 @@
 // reuses one (adding never makes a duplicate, and only ever adds sections).
 
 import { catalog } from "./catalog.js";
-import { el, renderChips, resetDeleteButton, showDialogError, showToast } from "./dom.js";
+import { ingredientWarning } from "./delete-warnings.js";
+import {
+  armDeleteButton,
+  el,
+  renderChips,
+  resetDeleteButton,
+  showDialogError,
+  showToast,
+} from "./dom.js";
 import { initItemSearch } from "./item-search.js";
 import { nameKey } from "./items.js";
 
@@ -203,10 +211,8 @@ async function submit(event) {
 
 /** First tap arms the button, second tap deletes. */
 async function deleteIngredient() {
-  const del = document.getElementById("ingredient-delete");
-  if (!del.dataset.armed) {
-    del.dataset.armed = "1";
-    del.textContent = "Really delete?";
+  if (!document.getElementById("ingredient-delete").dataset.armed) {
+    armDeleteButton("ingredient-delete", ingredientWarning(catalog.recipes(), editing.id));
     return;
   }
   try {

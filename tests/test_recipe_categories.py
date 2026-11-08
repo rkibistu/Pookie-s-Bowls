@@ -159,14 +159,12 @@ def test_deleting_a_category_keeps_its_recipes_inside_other_recipes(conn, catego
     assert [c["name"] for c in recipes.get(conn, bowl["id"])["components"]] == ["Spicy mayo"]
 
 
-def test_the_last_category_cannot_be_deleted(conn, category):
-    recipe_categories.delete(conn, category("Sauce"))
-    recipe_categories.delete(conn, category("Soup"))
+def test_the_last_category_can_be_deleted_too(conn, category):
+    """Prod starts with none, so having none is fine."""
+    for name in ("Sauce", "Soup", "Poke bowl"):
+        recipe_categories.delete(conn, category(name))
 
-    assert refused(lambda: recipe_categories.delete(conn, category("Poke bowl"))) == (
-        INVALID,
-        "The last category can't be deleted; rename it instead.",
-    )
+    assert recipe_categories.list_all(conn) == []
 
 
 def test_deleting_a_missing_category_says_so(conn):

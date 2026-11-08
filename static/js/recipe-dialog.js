@@ -2,7 +2,9 @@
 // saved as soon as it changes.
 
 import { catalog } from "./catalog.js";
+import { recipeWarning } from "./delete-warnings.js";
 import {
+  armDeleteButton,
   checkedChipIds,
   el,
   renderChips,
@@ -189,10 +191,8 @@ function makeEditable(id, options) {
 
 /** First tap arms the button, second tap deletes. */
 async function deleteRecipe() {
-  const del = document.getElementById("recipe-delete");
-  if (!del.dataset.armed) {
-    del.dataset.armed = "1";
-    del.textContent = "Really delete?";
+  if (!document.getElementById("recipe-delete").dataset.armed) {
+    armDeleteButton("recipe-delete", recipeWarning(catalog.recipes(), shownRecipe.id));
     return;
   }
   try {

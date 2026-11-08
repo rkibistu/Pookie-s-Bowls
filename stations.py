@@ -121,10 +121,8 @@ def create(conn, fields):
 
 def delete(conn, station_id):
     """Delete a station and its sections; ingredients only in those sections
-    become orphans. The last station can't be deleted."""
+    become orphans."""
     get(conn, station_id)  # not found?
-    if conn.execute("SELECT COUNT(*) FROM stations").fetchone()[0] == 1:
-        raise RuleError("The last station can't be deleted; rename it instead.")
     with conn:
         conn.execute("DELETE FROM stations WHERE id = ?", (station_id,))
 
