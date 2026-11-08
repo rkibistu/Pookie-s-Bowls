@@ -1,6 +1,6 @@
 # Migrations, and prod starts empty
 
-Status: ready-for-agent
+Status: done
 
 See `../spec.md` and ADR 0002.
 
@@ -24,4 +24,4 @@ See `../spec.md` and ADR 0002.
 
 ## Comments
 
-- Implemented (awaiting review). The old dev database and its `.bak` files are deleted; dev starts fresh from the migrations.
+- Done in 3ab9919. The old dev database and its `.bak` files are deleted; dev starts fresh from the migrations.

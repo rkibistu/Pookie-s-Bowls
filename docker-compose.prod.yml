@@ -1,0 +1,20 @@
+# Prod: the laptop at home. Deploy with
+#   git pull && docker compose -f docker-compose.prod.yml up -d --build
+# (see README). No source mount, no debug, no seed: prod starts empty.
+name: pookies-bowls-prod
+
+services:
+  web:
+    build: .
+    # --preload imports the app once, in gunicorn's main process, so the
+    # migrations run once before the workers start (not once per worker).
+    command: gunicorn --preload --workers 2 --bind 0.0.0.0:5000 app:app
+    ports:
+      - "5000:5000"
+    volumes:
+      # The database and its backups (data/pookie.db, data/backups/).
+      - ./data:/data
+    environment:
+      - DB_PATH=/data/pookie.db
+    # Comes back after a crash, `docker restart` or a reboot.
+    restart: unless-stopped

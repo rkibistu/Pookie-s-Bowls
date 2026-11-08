@@ -1,6 +1,6 @@
 # Prod compose file and deploy guide
 
-Status: ready-for-agent
+Status: done
 
 Blocked by: 01
 
@@ -19,3 +19,7 @@ See `../spec.md`.
 ## Done when
 
 - `docker compose -f docker-compose.prod.yml up -d --build` serves the app with gunicorn, starting from an empty database, and it comes back after `docker restart` or a reboot.
+
+## Comments
+
+- Done. Checked in Docker on port 5001 from a copy of the repo: empty at version 1, migrations once before the workers, data kept across `docker restart`. A failing migration stops the app; Docker's retries copy the database once, not once per retry (`db.backup` skips a copy identical to the newest one). Not checked: a real reboot.

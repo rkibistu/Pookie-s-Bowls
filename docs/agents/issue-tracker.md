@@ -10,7 +10,7 @@ Issues and specs for this repo live as markdown files in `tasks/`. Only open wor
   - Implementation issues are one file per ticket at `tasks/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`, never a single combined tickets file
 - Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
 - Comments and conversation history append to the bottom of the file under a `## Comments` heading
-- **Done**: when a task is finished, move its file into `tasks/completed/`. When every ticket of a feature is finished, move the whole `tasks/<feature-slug>/` directory into `tasks/completed/`.
+- **Done**: when a task is finished, move its file into `tasks/completed/`. When every ticket of a feature is finished, move the whole `tasks/<feature-slug>/` directory into `tasks/completed/`. A finished ticket of a feature that isn't finished yet stays where it is with `Status: done`, so the open tickets keep their `Blocked by:` links.
 
 ## When a skill says "publish to the issue tracker"
 
