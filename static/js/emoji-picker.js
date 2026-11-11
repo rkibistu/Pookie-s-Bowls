@@ -8,11 +8,11 @@ import { el } from "./dom.js";
 export const EMOJI_GROUPS = [
   ["Bowls & dishes", "🥣 🥗 🍲 🍜 🍝 🍛 🍣 🍱 🍙 🍚 🥘 🫕 🌮 🌯 🥙 🍔 🍕 🌭 🥪 🍟 🥟 🥞 🧇 🍳"],
   ["Meat & fish", "🍗 🍖 🥩 🥓 🍤 🐟 🦐 🦑 🐙 🦀 🦞 🦪 🥚"],
-  ["Vegetables", "🥑 🥦 🥬 🥒 🌶️ 🫑 🌽 🥕 🧅 🧄 🥔 🍠 🍅 🍆 🫛 🫘 🥜 🍄 🌿 🫚"],
+  ["Vegetables", "🥑 🥦 🥬 🥒 🌶️ 🫑 🌽 🥕 🧅 🧄 🥔 🍠 🍅 🍆 🫛 🫘 🥜 🍄 🌿 🫚 🫒"],
   ["Fruit", "🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥥 🥝"],
-  ["Bread, dairy & sweet", "🍞 🥐 🥖 🥯 🧀 🧈 🥛 🍦 🍰 🧁 🍪 🍫 🍯 🍮"],
+  ["Bread, dairy & sweet", "🍞 🥐 🥖 🫓 🌾 🥯 🧀 🧈 🥛 🍦 🍰 🧁 🍪 🍫 🍯 🍮"],
   ["Snacks & drinks", "🍿 🥨 🍘 🍡 🍢 🍥 🥠 🍩 🍬 🍭 🥧 🧆 ☕ 🍵 🧃 🥤 🧋 🍹 🍷 🍺 🥂"],
-  ["Kitchen", "🥫 🧂 🫙 🍴 🔪 🥢 🔥 ❄️ 🧊 🥶 ⛄ 🍧 🍨 ⭐ ✨ 💜 💚"],
+  ["Kitchen", "🥫 🧂 🫙 🥄 🍴 🔪 🥢 🔥 ❄️ 🧊 🥶 ⛄ 🍧 🍨 ⭐ ✨ 💜 💚"],
   ["Cultures", "🌍 🌎 🌏 🏮 🎎 🗾 🌺 🇯🇵 🇰🇷 🇨🇳 🇹🇭 🇻🇳 🇮🇳 🇲🇽 🇺🇸 🇮🇹 🇫🇷 🇪🇸 🇬🇷 🇹🇷"],
 ].map(([heading, emoji]) => [heading, emoji.split(" ")]);
 

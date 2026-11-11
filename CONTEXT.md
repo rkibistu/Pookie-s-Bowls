@@ -25,7 +25,7 @@ _Avoid_: heart, like
 ### Stations
 
 **Station**:
-A page set up for picking one kind of recipe (🥣 Poke, 🍔 Burger), with its own ordered sections and the recipe category that recipes started there begin in. The ingredient catalog is shared: the same ingredient can show up on several stations, or on none.
+A page set up for picking one kind of recipe (🥣 Poke, 🍔 Burger), with its own ordered sections and the recipe category that recipes started there begin in. The ingredient catalog is shared: the same ingredient can show up on several stations, or on none. Stations are for mix-and-match recipes, where new combinations are made by picking from sections; recipes followed as written (soups, doughs…) are made from the Recipes page, so most recipe categories have no station.
 _Avoid_: page, board, builder, Ingredients page
 
 **Section**:
