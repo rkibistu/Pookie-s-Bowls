@@ -131,3 +131,11 @@ def test_the_list_shows_the_newest_recipe_first(conn, category):
         recipes.create(conn, {"name": name, "category_ids": [category("Poke bowl")]})
 
     assert [r["name"] for r in recipes.list_all(conn)] == ["Miso soup", "Salmon bowl", "Spicy mayo"]
+
+
+def test_a_recipe_is_saved_with_its_first_letter_capitalised(conn, category):
+    mayo = recipes.create(conn, {"name": "spicy mayo", "category_ids": [category("Sauce")]})
+    assert mayo["name"] == "Spicy mayo"
+
+    renamed = recipes.change(conn, mayo["id"], {"name": "sriracha mayo"})
+    assert renamed["name"] == "Sriracha mayo"

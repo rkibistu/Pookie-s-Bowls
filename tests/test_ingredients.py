@@ -21,7 +21,7 @@ def test_an_ingredient_in_two_sections_shows_up_under_both_a_to_z(conn, section)
     listed = names_by_section(conn)
 
     assert listed["Protein"] == ["Tofu"]
-    assert listed["Topping"] == ["avocado", "Tofu"]
+    assert listed["Topping"] == ["Avocado", "Tofu"]
     assert listed["Base"] == []
 
 
@@ -38,12 +38,12 @@ def test_an_ingredient_can_be_in_no_section_and_is_still_in_the_catalog(conn, se
 
 
 def test_the_catalog_lists_every_ingredient_a_to_z_with_its_favorites(conn, ingredient):
-    ingredient("tofu")
+    ingredient("Tofu")
     ingredient("Avocado", "Topping")
 
     assert ingredients.list_all(conn) == [
         {"id": 2, "name": "Avocado", "last_unit": "g", "section_ids": [5], "favorites": []},
-        {"id": 1, "name": "tofu", "last_unit": "g", "section_ids": [1], "favorites": []},
+        {"id": 1, "name": "Tofu", "last_unit": "g", "section_ids": [1], "favorites": []},
     ]
 
 
@@ -93,7 +93,7 @@ def test_adding_a_taken_name_in_any_case_reuses_it_and_keeps_its_name(conn, ingr
 
 @pytest.mark.parametrize(
     "stored, typed",
-    [("Brânză", "branza"), ("șuncă", "ŞUNCĂ"), ("Spring onion", "  spring   ONION ")],
+    [("Brânză", "branza"), ("Șuncă", "ŞUNCĂ"), ("Spring onion", "  spring   ONION ")],
 )
 def test_adding_the_same_name_with_other_accents_or_spaces_reuses_it(conn, ingredient, stored, typed):
     first = ingredient(stored)
@@ -105,10 +105,10 @@ def test_adding_the_same_name_with_other_accents_or_spaces_reuses_it(conn, ingre
 
 
 def test_the_catalog_goes_a_to_z_ignoring_accents(conn, ingredient):
-    for name in ("Tofu", "Ștevie", "spinach", "Avocado"):
+    for name in ("Tofu", "Ștevie", "Spinach", "Avocado"):
         ingredient(name)
 
-    assert [i["name"] for i in ingredients.list_all(conn)] == ["Avocado", "spinach", "Ștevie", "Tofu"]
+    assert [i["name"] for i in ingredients.list_all(conn)] == ["Avocado", "Spinach", "Ștevie", "Tofu"]
 
 
 def test_adding_to_another_section_keeps_the_sections_it_was_in(conn, section, ingredient):
@@ -309,3 +309,11 @@ def test_a_missing_ingredient_is_not_found(conn):
         with pytest.raises(RuleError) as err:
             attempt()
         assert err.value.kind == NOT_FOUND
+
+
+def test_an_ingredient_is_saved_with_its_first_letter_capitalised(conn):
+    tofu = ingredients.add(conn, {"name": "tofu"})["ingredient"]
+    assert tofu["name"] == "Tofu"
+
+    renamed = ingredients.change(conn, tofu["id"], {"name": "salmon fillet"})
+    assert renamed["name"] == "Salmon fillet"

@@ -22,6 +22,16 @@ export const nameKey = (name) =>
     .split(/\s+/)
     .join(" ");
 
+/**
+ * The name as the server saves it: trimmed, first letter capitalised, the
+ * rest as typed ("spicy mayo" is "Spicy mayo", "BBQ sauce" stays). Same rule
+ * as the server's names.py (capitalised).
+ */
+export const capitalisedName = (name) => {
+  const [first = "", ...rest] = name.trim(); // by code point, so an emoji stays whole
+  return first.toUpperCase() + rest.join("");
+};
+
 /** "ingredient:3" or "recipe:7": tells items apart across both kinds. */
 export const itemKey = (item) => `${item.type}:${item.id}`;
 

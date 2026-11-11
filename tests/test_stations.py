@@ -52,14 +52,14 @@ def test_a_fresh_database_has_the_poke_station(conn, category):
 
 
 def test_a_section_shows_its_rows_a_to_z_with_favorites(conn, poke, category, ingredient):
-    ingredient("tofu")
+    ingredient("Tofu")
     ingredient("Salmon")
     recipes.create(conn, {"name": "Spicy mayo", "category_ids": [category("Sauce")]})
     recipes.create(conn, {"name": "Salmon bowl", "category_ids": [category("Poke bowl")]})
 
     by_name = {s["name"]: s["items"] for s in stations.get(conn, poke)["sections"]}
 
-    assert [i["name"] for i in by_name["Protein"]] == ["Salmon", "tofu"]
+    assert [i["name"] for i in by_name["Protein"]] == ["Salmon", "Tofu"]
     assert by_name["Sauce"] == [{"type": "recipe", "id": 1, "name": "Spicy mayo", "favorites": []}]
 
 
@@ -305,3 +305,19 @@ def test_a_sections_rows_go_a_to_z_ignoring_accents(conn, poke, ingredient):
     base = next(s for s in stations.get(conn, poke)["sections"] if s["name"] == "Base")
 
     assert [i["name"] for i in base["items"]] == ["Spinach", "Ștevie", "Tofu"]
+
+
+def test_a_station_is_saved_with_its_first_letter_capitalised(conn):
+    burger = stations.create(conn, {"name": "burger", "emoji": "🍔"})
+    assert burger["name"] == "Burger"
+
+    renamed = stations.change(conn, burger["id"], {"name": "smash burger"})
+    assert renamed["name"] == "Smash burger"
+
+
+def test_a_section_is_saved_with_its_first_letter_capitalised(conn, poke):
+    greens = stations.add_section(conn, poke, {"name": "greens"})
+    assert greens["name"] == "Greens"
+
+    renamed = stations.rename_section(conn, greens["id"], "leafy greens")
+    assert renamed["name"] == "Leafy greens"

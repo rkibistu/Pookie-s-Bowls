@@ -155,7 +155,7 @@ def _parse_name(name):
     name = name.strip() if isinstance(name, str) else ""
     if not name:
         raise RuleError("Please give the category a name.")
-    return name
+    return names.capitalised(name)
 
 
 def _parse_emoji(emoji):

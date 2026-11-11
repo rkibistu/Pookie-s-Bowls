@@ -172,3 +172,11 @@ def test_deleting_a_missing_category_says_so(conn):
         NOT_FOUND,
         "Category not found.",
     )
+
+
+def test_a_category_is_saved_with_its_first_letter_capitalised(conn):
+    pizza = recipe_categories.create(conn, {"name": "pizza", "emoji": "🍕"})
+    assert pizza["name"] == "Pizza"
+
+    renamed = recipe_categories.change(conn, pizza["id"], {"name": "flatbread"})
+    assert renamed["name"] == "Flatbread"

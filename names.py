@@ -14,3 +14,14 @@ def key(name):
     decomposed = unicodedata.normalize("NFKD", name)
     unaccented = "".join(c for c in decomposed if not unicodedata.combining(c))
     return " ".join(unaccented.casefold().split())
+
+
+def capitalised(name):
+    """The name trimmed, with its first letter capitalised and the rest as typed.
+
+    "spicy mayo" is saved as "Spicy mayo", "BBQ sauce" stays as it is, and a
+    name starting with no letter ("00 flour") is unchanged. Every saved name
+    goes through this; static/js/items.js has the same rule (capitalisedName).
+    """
+    name = name.strip()
+    return name[:1].upper() + name[1:]

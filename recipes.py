@@ -18,6 +18,7 @@ import math
 from urllib.parse import urlsplit
 
 import favorites
+import names
 from errors import NOT_FOUND, RuleError
 
 FIELDS = ("name", "url", "notes", "category_ids", "components")
@@ -181,7 +182,7 @@ def _parse_name(name):
     name = name.strip() if isinstance(name, str) else ""
     if not name:
         raise RuleError("Please give the recipe a name.")
-    return name
+    return names.capitalised(name)
 
 
 def _parse_notes(notes):
