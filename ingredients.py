@@ -81,16 +81,7 @@ def add(conn, fields):
         conn, {"name": fields.get("name"), "section_ids": fields.get("section_ids", [])}
     )
     with conn:
-        # The unique index decides "same name", so the lookup can't disagree
-        # with it, and two adds at once can't both insert.
-        name_key = names.key(ingredient["name"])
-        reused = conn.execute(
-            "INSERT INTO ingredients (name, name_key) VALUES (?, ?) ON CONFLICT DO NOTHING",
-            (ingredient["name"], name_key),
-        ).rowcount == 0
-        ingredient_id = conn.execute(
-            "SELECT id FROM ingredients WHERE name_key = ?", (name_key,)
-        ).fetchone()[0]
+        ingredient_id, reused = insert_or_reuse(conn, ingredient["name"])
         already = set(_section_ids(conn, ingredient_id).get(ingredient_id, []))
         added_to = [s for s in ingredient["section_ids"] if s not in already]
         conn.executemany(
@@ -98,6 +89,25 @@ def add(conn, fields):
             [(s, ingredient_id) for s in added_to],
         )
     return {"ingredient": get(conn, ingredient_id), "reused": reused, "added_to": added_to}
+
+
+def insert_or_reuse(conn, name):
+    """The ingredient with this name (names.py), added to the catalog with no
+    sections if it isn't there yet: (id, reused). Runs inside the caller's
+    transaction, so a recipe can add a new ingredient in the same save.
+    """
+    name = _parse_name(name)
+    # The unique index decides "same name", so the lookup can't disagree
+    # with it, and two adds at once can't both insert.
+    name_key = names.key(name)
+    reused = conn.execute(
+        "INSERT INTO ingredients (name, name_key) VALUES (?, ?) ON CONFLICT DO NOTHING",
+        (name, name_key),
+    ).rowcount == 0
+    ingredient_id = conn.execute(
+        "SELECT id FROM ingredients WHERE name_key = ?", (name_key,)
+    ).fetchone()[0]
+    return ingredient_id, reused
 
 
 def change(conn, ingredient_id, fields):

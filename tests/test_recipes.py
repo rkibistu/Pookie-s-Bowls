@@ -1,5 +1,6 @@
 import pytest
 
+import ingredients
 import recipes
 from errors import INVALID, NOT_FOUND, RuleError
 
@@ -139,3 +140,102 @@ def test_a_recipe_is_saved_with_its_first_letter_capitalised(conn, category):
 
     renamed = recipes.change(conn, mayo["id"], {"name": "sriracha mayo"})
     assert renamed["name"] == "Sriracha mayo"
+
+
+def test_a_new_ingredient_in_a_recipe_joins_the_catalog_with_no_sections(conn, category):
+    bowl = recipes.create(
+        conn,
+        {
+            "name": "Tofu bowl",
+            "category_ids": [category("Poke bowl")],
+            "components": [{"type": "ingredient", "name": "tofu", "quantity": 120, "unit": "g"}],
+        },
+    )
+
+    [tofu] = ingredients.list_all(conn)
+    assert (tofu["name"], tofu["section_ids"]) == ("Tofu", [])
+    assert [(c["id"], c["name"], c["quantity"], c["unit"]) for c in bowl["components"]] == [
+        (tofu["id"], "Tofu", 120, "g")
+    ]
+
+
+def test_a_new_ingredient_added_while_editing_a_recipe_joins_the_catalog(conn, category, ingredient):
+    rice = ingredient("Rice")
+    bowl = recipes.create(
+        conn, {"name": "Bowl", "category_ids": [category("Poke bowl")], "components": [{"type": "ingredient", "id": rice}]}
+    )
+
+    changed = recipes.change(
+        conn,
+        bowl["id"],
+        {"components": [{"type": "ingredient", "id": rice}, {"type": "ingredient", "name": "edamame"}]},
+    )
+
+    assert [i["name"] for i in ingredients.list_all(conn)] == ["Edamame", "Rice"]
+    assert [(c["name"], c["quantity"], c["unit"]) for c in changed["components"]] == [
+        ("Rice", 0, "g"),
+        ("Edamame", 0, "g"),
+    ]
+
+
+@pytest.mark.parametrize("stored, typed", [("Tofu", "tofu"), ("Ștevie", "stevie")])
+def test_a_new_ingredient_whose_name_is_taken_reuses_it(conn, category, ingredient, stored, typed):
+    existing = ingredient(stored)
+
+    bowl = recipes.create(
+        conn,
+        {
+            "name": "Bowl",
+            "category_ids": [category("Poke bowl")],
+            "components": [{"type": "ingredient", "name": typed}],
+        },
+    )
+
+    assert [i["name"] for i in ingredients.list_all(conn)] == [stored]
+    assert [(c["id"], c["name"]) for c in bowl["components"]] == [(existing, stored)]
+
+
+def test_a_new_ingredient_and_its_name_already_in_the_recipe_make_one_row(conn, category, ingredient):
+    rice = ingredient("Rice")
+
+    bowl = recipes.create(
+        conn,
+        {
+            "name": "Bowl",
+            "category_ids": [category("Poke bowl")],
+            "components": [
+                {"type": "ingredient", "name": "tofu", "quantity": 100},
+                {"type": "ingredient", "id": rice, "quantity": 50},
+                {"type": "ingredient", "name": " TOFU ", "quantity": 200},
+                {"type": "ingredient", "name": "rice", "quantity": 80},
+            ],
+        },
+    )
+
+    assert [(c["name"], c["quantity"]) for c in bowl["components"]] == [("Tofu", 100), ("Rice", 50)]
+    assert [i["name"] for i in ingredients.list_all(conn)] == ["Rice", "Tofu"]
+
+
+@pytest.mark.parametrize(
+    "fields, message",
+    [
+        ({"category_ids": []}, "Pick at least one category."),
+        # Fails after Tofu is in: a blank second name.
+        ({"components": [{"type": "ingredient", "name": "tofu"}, {"type": "ingredient", "name": " "}]},
+         "Please give the ingredient a name."),
+    ],
+)
+def test_a_save_that_fails_adds_no_new_ingredient(conn, category, fields, message):
+    attempt = {
+        "name": "Bowl",
+        "category_ids": [category("Poke bowl")],
+        "components": [{"type": "ingredient", "name": "tofu"}],
+        **fields,
+    }
+
+    with pytest.raises(RuleError) as err:
+        recipes.create(conn, attempt)
+
+    assert err.value.message == message
+    assert ingredients.list_all(conn) == []
+    assert recipes.list_all(conn) == []

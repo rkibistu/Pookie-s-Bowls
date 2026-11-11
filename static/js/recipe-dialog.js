@@ -244,6 +244,8 @@ export function initRecipeDialog() {
     (key) =>
       key === `recipe:${shownRecipe.id}` || shownRecipe.components.some((c) => itemKey(c) === key),
     (item) => saveRecipePatch({ components: [...shownRecipe.components, item] }),
+    // A new ingredient is created with the recipe's new list, in the same save.
+    { takenNames: () => shownRecipe.components.map((c) => c.name) },
   );
   document.getElementById("recipe-pick").addEventListener("click", () => {
     const recipe = shownRecipe;

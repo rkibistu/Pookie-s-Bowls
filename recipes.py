@@ -18,6 +18,7 @@ import math
 from urllib.parse import urlsplit
 
 import favorites
+import ingredients
 import names
 from errors import NOT_FOUND, RuleError
 
@@ -138,7 +139,7 @@ def create(conn, fields):
             (recipe["name"], recipe["url"], recipe["notes"]),
         )
         _write_categories(conn, cur.lastrowid, recipe["category_ids"])
-        _write_components(conn, cur.lastrowid, recipe["components"])
+        _write_components(conn, cur.lastrowid, _resolve(conn, recipe["components"]))
     return get(conn, cur.lastrowid)
 
 
@@ -158,7 +159,7 @@ def change(conn, recipe_id, fields):
         if "category_ids" in recipe:
             _write_categories(conn, recipe_id, recipe["category_ids"])
         if "components" in recipe:
-            _write_components(conn, recipe_id, recipe["components"])
+            _write_components(conn, recipe_id, _resolve(conn, recipe["components"]))
     return get(conn, recipe_id)
 
 
@@ -228,37 +229,52 @@ def _parse_category_ids(conn, category_ids):
 
 
 def _parse_components(conn, components, recipe_id):
-    """Known items, deduped, in pick order: {(type, id): (quantity, unit)}.
+    """Known items in pick order: [((type, id), quantity, unit)].
 
+    A new ingredient, {type: "ingredient", name} with no id, is (("new",
+    name), quantity, unit) until _resolve adds it to the catalog.
     A quantity or unit left out (None) keeps the row's, if the recipe has
     the item already; a new row starts at 0, in the item's last unit.
     recipe_id is the recipe being changed, which must not end up inside itself.
     """
     if components is None:
-        return {}
+        return []
     invalid = RuleError("components must be a list of {type, id} items.")
     if not isinstance(components, list):
         raise invalid
-    parsed = {}
+    parsed = []
     for c in components:
         if not isinstance(c, dict) or c.get("type") not in ("ingredient", "recipe"):
             raise invalid
-        if not _is_id(c.get("id")):
+        if _is_id(c.get("id")):
+            key = (c["type"], c["id"])
+        elif c["type"] == "ingredient" and c.get("id") is None and isinstance(c.get("name"), str):
+            key = ("new", c["name"])
+        else:
             raise invalid
-        # dedupe, keep the first
-        parsed.setdefault(
-            (c["type"], c["id"]), (_parse_quantity(c.get("quantity")), _parse_unit(c.get("unit")))
-        )
+        parsed.append((key, _parse_quantity(c.get("quantity")), _parse_unit(c.get("unit"))))
 
-    ingredient_ids = [i for t, i in parsed if t == "ingredient"]
+    ingredient_ids = list({i for (t, i), _, _ in parsed if t == "ingredient"})
     if _count_known(conn, "ingredients", ingredient_ids) != len(ingredient_ids):
         raise RuleError("Unknown ingredient.")
-    recipe_ids = [i for t, i in parsed if t == "recipe"]
+    recipe_ids = list({i for (t, i), _, _ in parsed if t == "recipe"})
     if _count_known(conn, "recipes", recipe_ids) != len(recipe_ids):
         raise RuleError("Unknown recipe.")
     if recipe_id is not None and recipe_id in _inside(conn, recipe_ids):
         raise RuleError("A recipe can't go inside itself.")
     return parsed
+
+
+def _resolve(conn, components):
+    """The parsed components as {(type, id): (quantity, unit)}, deduped
+    (the first kept), each new ingredient added to the catalog or, if its
+    name is taken, reused. Runs inside the save's transaction."""
+    resolved = {}
+    for (type_, item), quantity, unit in components:
+        if type_ == "new":
+            type_, item = "ingredient", ingredients.insert_or_reuse(conn, item)[0]
+        resolved.setdefault((type_, item), (quantity, unit))
+    return resolved
 
 
 def _parse_quantity(quantity):

@@ -4,32 +4,23 @@
 import { catalog } from "./catalog.js";
 import { checkedChipIds, el, renderChips, showDialogError, showToast } from "./dom.js";
 import { initItemSearch } from "./item-search.js";
-import { itemKey, picksByKey, renderComponentRow } from "./items.js";
+import { draftPicks, pickKey, renderComponentRow } from "./items.js";
 import { pickSession } from "./pick-session.js";
 import { lastUnit, quantityControls, showsQuantities } from "./quantities.js";
 import { categoryChipOptions, defaultCategoryIds, recipeEmoji } from "./recipe-categories.js";
 
 // The new recipe being written in the build dialog: {picks}, or null. picks
-// is Map<itemKey, {type, id, name, quantity, unit}> in pick order; its other
+// is Map<pickKey, {type, id, name, quantity, unit}> in pick order (a new
+// ingredient has id null and is created when the Draft is saved); its other
 // fields live in the dialog's form until it's saved or cancelled.
 let draft = null;
-
-/**
- * These items as a draft's picks, in their order: one in before (the picks
- * it had) keeps its quantity, a new one starts at 0 in its last unit.
- */
-function draftPicks(items, before = new Map()) {
-  return picksByKey(
-    items.map((item) => before.get(itemKey(item)) ?? { ...item, quantity: 0, unit: lastUnit(item) }),
-  );
-}
 
 /**
  * Start a new recipe: empty form, with these picks, in categoryId (a
  * station's category) or else the first category.
  */
 function startDraft(picks = [], categoryId = null) {
-  draft = { picks: draftPicks(picks) };
+  draft = { picks: draftPicks(picks, new Map(), lastUnit) };
   document.getElementById("build-form").reset();
   document.getElementById("build-add-suggestions").hidden = true;
   renderChips("build-categories", categoryChipOptions(), defaultCategoryIds(categoryId));
@@ -98,7 +89,7 @@ function pickFromDialog() {
     picks: [...draft.picks.values()],
     doneLabel: "Done ✓",
     onDone: (picked) => {
-      draft.picks = draftPicks(picked, draft.picks);
+      draft.picks = draftPicks(picked, draft.picks, lastUnit);
       openBuildDialog();
     },
     onCancel: openBuildDialog,
@@ -112,12 +103,10 @@ async function saveBuilt(event) {
     url: document.getElementById("build-url").value,
     notes: document.getElementById("build-notes").value,
     category_ids: checkedChipIds("build-categories"),
-    components: [...draft.picks.values()].map(({ type, id, quantity, unit }) => ({
-      type,
-      id,
-      quantity,
-      unit,
-    })),
+    // A new ingredient goes by its name; the server adds it to the catalog.
+    components: [...draft.picks.values()].map(({ type, id, name, quantity, unit }) =>
+      id == null ? { type, name, quantity, unit } : { type, id, quantity, unit },
+    ),
   };
   const save = document.getElementById("build-save");
   save.disabled = true;
@@ -143,9 +132,10 @@ export function initNewRecipe() {
     "build-add-suggestions",
     (key) => draft.picks.has(key),
     (item) => {
-      draft.picks.set(itemKey(item), { ...item, quantity: 0, unit: lastUnit(item) });
+      draft.picks.set(pickKey(item), { ...item, quantity: 0, unit: lastUnit(item) });
       renderDialogPicks();
     },
+    { takenNames: () => [...draft.picks.values()].map((pick) => pick.name) },
   );
   // Ticking a category can show or hide the quantities.
   document.getElementById("build-categories").addEventListener("change", () => {

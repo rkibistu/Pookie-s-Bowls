@@ -32,6 +32,25 @@ export const capitalisedName = (name) => {
   return first.toUpperCase() + rest.join("");
 };
 
+const SUGGESTIONS = 6;
+
+/**
+ * What the type-ahead offers for query: {matches, newName}. matches are the
+ * items whose name contains it (not excluded(itemKey), at most 6); newName,
+ * when offerNew, is the query as a new ingredient's saved name, offered only
+ * if nothing in items or takenNames has the Same name; otherwise null.
+ */
+export function suggestions(items, query, { excluded = () => false, offerNew = false, takenNames = [] } = {}) {
+  const key = nameKey(query);
+  if (!key) return { matches: [], newName: null };
+  const matches = items
+    .filter((item) => !excluded(itemKey(item)))
+    .filter((item) => nameKey(item.name).includes(key))
+    .slice(0, SUGGESTIONS);
+  const taken = [...items.map((item) => item.name), ...takenNames].some((name) => nameKey(name) === key);
+  return { matches, newName: offerNew && !taken ? capitalisedName(query) : null };
+}
+
 /** "ingredient:3" or "recipe:7": tells items apart across both kinds. */
 export const itemKey = (item) => `${item.type}:${item.id}`;
 
@@ -40,8 +59,26 @@ export const itemLabel = (item) => (item.type === "recipe" ? `${SUB_RECIPE} ${it
 
 const SUB_RECIPE = "📖"; // marks a recipe used inside another recipe
 
-/** Picks as a Map<itemKey, pick>, the way the draft keeps them. */
-export const picksByKey = (picks) => new Map(picks.map((p) => [itemKey(p), p]));
+/**
+ * Tells picks apart: itemKey for an item in the catalog; a new ingredient
+ * (no id yet, created when the recipe is saved) by its name, so two new
+ * picks with the Same name are one.
+ */
+export const pickKey = (pick) => (pick.id == null ? `new:${nameKey(pick.name)}` : itemKey(pick));
+
+/** Picks as a Map<pickKey, pick>, the way the draft keeps them; the first of the same pick wins. */
+export const picksByKey = (picks) => {
+  const byKey = new Map();
+  for (const pick of picks) if (!byKey.has(pickKey(pick))) byKey.set(pickKey(pick), pick);
+  return byKey;
+};
+
+/**
+ * These items as a draft's picks, in their order: one in before (the picks
+ * it had) keeps its quantity, a new one starts at 0 in lastUnit(item).
+ */
+export const draftPicks = (items, before, lastUnit) =>
+  picksByKey(items.map((item) => before.get(pickKey(item)) ?? { ...item, quantity: 0, unit: lastUnit(item) }));
 
 /** Name followed by the hearts of whoever favorited it; pop's heart animates in. */
 export function renderItemLabel(item, pop = null) {
@@ -82,7 +119,10 @@ export function renderComponentRow(
     item.append(open);
   } else {
     if (component.type === "recipe") item.append(el("span", null, SUB_RECIPE));
-    item.append(renderItemLabel(component));
+    const label = renderItemLabel(component);
+    // Not in the catalog until the recipe is saved: a typo can still be caught.
+    if (component.id == null) label.append(el("span", "new-tag", "new"));
+    item.append(label);
   }
   if (quantity) item.append(quantity);
   if (!onRemove) return item;

@@ -1206,6 +1206,17 @@ body.selecting .ingredient-row.unpickable::after {
     color: #fff;
 }
 
+/* A Draft's ingredient that's not in the catalog yet. */
+.new-tag {
+    flex: none;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
 /* A quantity on the right of its row: amount box, then unit. */
 /* A long name wraps rather than squeezing the quantity. */
 .recipe-ingredient .ingredient-label,

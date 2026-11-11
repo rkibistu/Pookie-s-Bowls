@@ -4,51 +4,54 @@
 
 import { el } from "./dom.js";
 import { catalog } from "./catalog.js";
-import { itemKey, itemLabel, nameKey } from "./items.js";
-
-const FILTER_SUGGESTIONS = 6;
+import { itemLabel, suggestions } from "./items.js";
 
 /**
  * Type-ahead over items() (catalog.items() unless given): typing shows
  * matches under the input, tapping one (or Enter for the first, unless
  * pickOnEnter is false) calls onPick(item). Items whose key excluded(key)
  * says are already taken aren't suggested; noMatch is what shows when
- * nothing matches (null: nothing).
+ * nothing matches (null: nothing). With takenNames (() => names already in
+ * the recipe), a name nothing has is offered last as a new ingredient, picked
+ * as {type: "ingredient", id: null, name}.
  */
 export function initItemSearch(
   inputId,
   listId,
   excluded,
   onPick,
-  { items = catalog.items, pickOnEnter = true, noMatch = "No match" } = {},
+  { items = catalog.items, pickOnEnter = true, noMatch = "No match", takenNames = null } = {},
 ) {
   closeSuggestionsOnOutsideTap();
   const input = document.getElementById(inputId);
   const list = document.getElementById(listId);
 
-  /** Show items matching what's typed; returns the matches. */
+  /** Show the rows for what's typed; returns the items they pick, in order. */
   function render() {
-    const query = nameKey(input.value); // "branza" finds Brânză
+    // "branza" finds Brânză
+    const { matches, newName } = suggestions(items(), input.value, {
+      excluded,
+      offerNew: takenNames !== null,
+      takenNames: takenNames ? takenNames() : [],
+    });
+    const rows = matches.map((item) => [itemLabel(item), item]);
+    if (newName) {
+      rows.push([`➕ Add “${newName}” as a new ingredient`, { type: "ingredient", id: null, name: newName }]);
+    }
     list.replaceChildren();
-    const matches = query
-      ? items()
-          .filter((item) => !excluded(itemKey(item)))
-          .filter((item) => nameKey(item.name).includes(query))
-          .slice(0, FILTER_SUGGESTIONS)
-      : [];
-    for (const item of matches) {
-      const option = el("button", "filter-suggestion", itemLabel(item));
+    for (const [label, item] of rows) {
+      const option = el("button", "filter-suggestion", label);
       option.type = "button";
       option.addEventListener("click", () => pick(item));
       const li = el("li");
       li.append(option);
       list.append(li);
     }
-    if (query && matches.length === 0 && noMatch) {
+    if (input.value.trim() && rows.length === 0 && noMatch && takenNames === null) {
       list.append(el("li", "filter-no-match", noMatch));
     }
     list.hidden = list.children.length === 0;
-    return matches;
+    return rows.map(([, item]) => item);
   }
 
   function pick(item) {
