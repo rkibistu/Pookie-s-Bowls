@@ -7,8 +7,12 @@ A shared recipe book for two people: an ingredient catalog, recipes built from t
 ### The catalog
 
 **Ingredient**:
-A base item in the catalog, such as salmon or rice. It is never a recipe: a sauce is a recipe, even though it is shown and picked like an ingredient. Its name is unique (see **Same name**). Adding an ingredient never makes a duplicate: a name already in the catalog reuses that ingredient, keeping its name. Adding only ever puts it into more sections; taking it out of one is an edit.
+A base item in the catalog, such as salmon or rice. It is never a recipe: a sauce is a recipe, even though it is shown and picked like an ingredient. Its name is unique (see **Same name**). Adding an ingredient never makes a duplicate: a name already in the catalog reuses that ingredient, keeping its name. Adding only ever puts it into more sections; taking it out of one is an edit. Names can be in any language: the same food named in two languages (*Onion*, *Ceapă*) is two ingredients, until one is merged into the other.
 _Avoid_: item (that also covers listed recipes)
+
+**Merge**:
+Renaming an ingredient to the name of another one, once confirmed, folds the first into the second: it is as if the first had always been the second, in every recipe, section and favorite, and the first is gone. The second keeps its own name. Only ingredients merge, never recipes.
+_Avoid_: combine, join, dedupe
 
 **Same name**:
 Two names are the same when they differ only in case, accents or extra spaces: *branza* is *Brânză*, *Spring  onion* is *Spring onion*. Ingredient, station and recipe category names are unique this way, and so are section names within a station. The name kept is the one typed first. Every name is saved with its first letter capitalised; the rest is kept as typed.
