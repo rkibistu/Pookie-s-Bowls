@@ -15,6 +15,7 @@ import {
 } from "./dom.js";
 import { initItemSearch } from "./item-search.js";
 import { nameKey } from "./items.js";
+import { mergeQuestion } from "./merge-question.js";
 
 let editing = null; // the ingredient being edited, or null while adding
 // While adding, where it goes: {station} (tick its sections), {section} (that
@@ -177,9 +178,16 @@ async function save() {
       add_section_ids: [...after].filter((id) => !before.has(id)),
       remove_section_ids: [...before].filter((id) => !after.has(id)),
     };
+    // Renamed to another one's name: a Merge, only once asked.
+    const other = existingIngredient(name);
+    if (other && other.id !== editing.id) {
+      if (!(await askMerge(editing, other, [...after]))) return false;
+      await catalog.mergeIngredient(editing.id, { into: other.id, ...fields });
+      return true;
+    }
     if (name.trim() !== editing.name) fields.name = name;
     await catalog.changeIngredient(editing.id, fields);
-    return;
+    return true;
   }
   const sectionIds = adding.section ? [adding.section.id] : tickedSectionIds({ newOnly: true });
   const { ingredient, reused, added_to } = await catalog.addIngredient({
@@ -193,6 +201,25 @@ async function save() {
       ? `${ingredient.name} was already in the catalog, added to ${places.join(", ")}`
       : `${ingredient.name} is already in the catalog`,
   );
+  return true;
+}
+
+/**
+ * Ask whether to merge ingredient into other (merge-question.js), on top of
+ * this dialog; resolves to true only for the merge button. sectionIds: the
+ * sections ticked here, which go to other with it.
+ */
+function askMerge(ingredient, other, sectionIds) {
+  const { question, consequence, confirm } = mergeQuestion(catalog.recipes(), ingredient, other, sectionIds);
+  document.getElementById("merge-question").textContent = question;
+  document.getElementById("merge-consequence").textContent = consequence;
+  document.getElementById("merge-confirm").textContent = confirm;
+  const dialog = document.getElementById("merge-dialog");
+  dialog.returnValue = "";
+  dialog.showModal();
+  return new Promise((resolve) =>
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "merge"), { once: true }),
+  );
 }
 
 async function submit(event) {
@@ -200,8 +227,8 @@ async function submit(event) {
   const button = document.getElementById("ingredient-save");
   button.disabled = true;
   try {
-    await save();
-    document.getElementById("ingredient-dialog").close();
+    // Not saved (the merge was cancelled): stays open with its edits.
+    if (await save()) document.getElementById("ingredient-dialog").close();
   } catch (err) {
     showDialogError(err.message, "ingredient-error");
   } finally {

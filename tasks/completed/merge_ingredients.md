@@ -1,6 +1,6 @@
 # Merge an ingredient into another by renaming it
 
-Status: ready-for-agent
+Status: done
 
 Ingredient names can be in any language, so the same food often ends up twice (*Onion* in one recipe, *Ceapă* in another). That's fine until it isn't: then the two should become one. Today renaming *Ceapă* to *Onion* is refused ("An ingredient with that name already exists."), and the only way out is to fix every recipe by hand. Instead, that rename becomes a **Merge** (see `CONTEXT.md`).
 

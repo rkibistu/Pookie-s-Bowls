@@ -144,6 +144,19 @@
         </form>
     </dialog>
 
+    <!-- A rename to a taken name: asked on top of the ingredient dialog. -->
+    <dialog class="dialog" id="merge-dialog">
+        <form method="dialog">
+            <h2 id="merge-question"></h2>
+            <p class="dialog-hint" id="merge-consequence"></p>
+            <div class="dialog-actions">
+                <span class="spacer"></span>
+                <button type="submit" class="secondary-btn" value="cancel">Cancel</button>
+                <button type="submit" class="danger-btn" id="merge-confirm" value="merge"></button>
+            </div>
+        </form>
+    </dialog>
+
     <aside class="build-tray" id="build-tray" aria-label="Your recipe" hidden>
         <header class="build-tray-header">
             <h2 id="build-title">🥣 Your recipe</h2>

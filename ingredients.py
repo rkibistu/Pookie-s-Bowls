@@ -14,7 +14,8 @@ import favorites
 import names
 from errors import DUPLICATE, NOT_FOUND, RuleError
 
-FIELDS = ("name", "add_section_ids", "remove_section_ids")
+SECTION_FIELDS = ("add_section_ids", "remove_section_ids")
+FIELDS = ("name", *SECTION_FIELDS)
 
 
 # ---- Reading -------------------------------------------------------------
@@ -120,10 +121,7 @@ def change(conn, ingredient_id, fields):
     if not isinstance(fields, dict):
         raise RuleError("Expected a JSON object.")
     ingredient = _parse(conn, {k: v for k, v in fields.items() if k in FIELDS})
-    added = ingredient.get("add_section_ids", [])
-    removed = ingredient.get("remove_section_ids", [])
-    if set(added) & set(removed):
-        raise RuleError("A section can't be both added and removed.")
+    _check_section_changes(ingredient)
     try:
         with conn:
             if "name" in ingredient:
@@ -131,18 +129,67 @@ def change(conn, ingredient_id, fields):
                     "UPDATE ingredients SET name = ?, name_key = ? WHERE id = ?",
                     (ingredient["name"], names.key(ingredient["name"]), ingredient_id),
                 )
-            conn.executemany(
-                "INSERT OR IGNORE INTO section_ingredients (section_id, ingredient_id) "
-                "VALUES (?, ?)",
-                [(s, ingredient_id) for s in added],
-            )
-            conn.executemany(
-                "DELETE FROM section_ingredients WHERE section_id = ? AND ingredient_id = ?",
-                [(s, ingredient_id) for s in removed],
-            )
+            _change_sections(conn, ingredient_id, ingredient)
     except sqlite3.IntegrityError:
         raise _duplicate_name()
     return get(conn, ingredient_id)
+
+
+def _check_section_changes(fields):
+    if set(fields.get("add_section_ids", [])) & set(fields.get("remove_section_ids", [])):
+        raise RuleError("A section can't be both added and removed.")
+
+
+def _change_sections(conn, ingredient_id, fields):
+    """Tick (add_section_ids) and untick (remove_section_ids) its sections;
+    the ones not mentioned stay as stored."""
+    conn.executemany(
+        "INSERT OR IGNORE INTO section_ingredients (section_id, ingredient_id) VALUES (?, ?)",
+        [(s, ingredient_id) for s in fields.get("add_section_ids", [])],
+    )
+    conn.executemany(
+        "DELETE FROM section_ingredients WHERE section_id = ? AND ingredient_id = ?",
+        [(s, ingredient_id) for s in fields.get("remove_section_ids", [])],
+    )
+
+
+def merge(conn, ingredient_id, into_id, fields):
+    """Fold this ingredient into another (CONTEXT.md, Merge): as if it had
+    always been that one, in every recipe, section and favorite; then it's
+    gone. The other keeps its own name and last unit. Returns the other.
+
+    fields: the section ticks changed in the same Save (add_section_ids,
+    remove_section_ids), applied to this one first, so they end up on the
+    other too; a merge only ever adds sections to the other.
+    """
+    get(conn, ingredient_id)  # not found?
+    get(conn, into_id)
+    if into_id == ingredient_id:
+        raise RuleError("An ingredient can't be merged into itself.")
+    if not isinstance(fields, dict):
+        raise RuleError("Expected a JSON object.")
+    sections = _parse(conn, {k: v for k, v in fields.items() if k in SECTION_FIELDS})
+    _check_section_changes(sections)
+    with conn:
+        _change_sections(conn, ingredient_id, sections)
+        # A recipe that has both keeps the other's row; this one's goes with it.
+        conn.execute(
+            "UPDATE recipe_components SET ingredient_id = ? WHERE ingredient_id = ? "
+            "AND recipe_id NOT IN (SELECT recipe_id FROM recipe_components WHERE ingredient_id = ?)",
+            (into_id, ingredient_id, into_id),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO section_ingredients (section_id, ingredient_id) "
+            "SELECT section_id, ? FROM section_ingredients WHERE ingredient_id = ?",
+            (into_id, ingredient_id),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO favorites (person, ingredient_id) "
+            "SELECT person, ? FROM favorites WHERE ingredient_id = ?",
+            (into_id, ingredient_id),
+        )
+        conn.execute("DELETE FROM ingredients WHERE id = ?", (ingredient_id,))
+    return get(conn, into_id)
 
 
 def delete(conn, ingredient_id):

@@ -115,6 +115,8 @@ export function createCatalog({ api }) {
      */
     changeIngredient: (id, fields) => save("PATCH", `/api/ingredients/${id}`, fields),
     deleteIngredient: (id) => save("DELETE", `/api/ingredients/${id}`),
+    /** Fold it into another ({into, add_section_ids, remove_section_ids}); resolves to the other. */
+    mergeIngredient: (id, fields) => save("POST", `/api/ingredients/${id}/merge`, fields),
     createRecipeCategory: (fields) => save("POST", "/api/recipe-categories", fields),
     /** Change only the fields given (name, emoji, shows_quantities). */
     changeRecipeCategory: (id, fields) => save("PATCH", `/api/recipe-categories/${id}`, fields),

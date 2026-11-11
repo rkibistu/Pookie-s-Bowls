@@ -69,6 +69,17 @@ def change_ingredient(ingredient_id):
     )
 
 
+@app.post("/api/ingredients/<int:ingredient_id>/merge")
+def merge_ingredient(ingredient_id):
+    """Body: {into: the other ingredient's id, add_section_ids?, remove_section_ids?};
+    returns the other, which is all that's left."""
+    body = request.get_json(silent=True)
+    into = body.get("into") if isinstance(body, dict) else None
+    if not isinstance(into, int) or isinstance(into, bool):
+        raise errors.RuleError("into must be an ingredient id.")
+    return jsonify(ingredients.merge(db.get_db(), ingredient_id, into, body))
+
+
 @app.delete("/api/ingredients/<int:ingredient_id>")
 def delete_ingredient(ingredient_id):
     ingredients.delete(db.get_db(), ingredient_id)

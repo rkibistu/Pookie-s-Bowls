@@ -1,5 +1,6 @@
 import pytest
 
+import favorites
 import ingredients
 import recipes
 import stations
@@ -317,3 +318,129 @@ def test_an_ingredient_is_saved_with_its_first_letter_capitalised(conn):
 
     renamed = ingredients.change(conn, tofu["id"], {"name": "salmon fillet"})
     assert renamed["name"] == "Salmon fillet"
+
+
+# ---- Merging: renaming to a taken name, confirmed ----------------------------
+
+
+def components(conn, recipe_id):
+    """A recipe's rows in order: [(name, quantity, unit)]."""
+    return [(c["name"], c["quantity"], c["unit"]) for c in recipes.get(conn, recipe_id)["components"]]
+
+
+def recipe(conn, category, name, rows):
+    """A Poke bowl with these rows: [(ingredient id, quantity, unit)]; returns its id."""
+    return recipes.create(
+        conn,
+        {
+            "name": name,
+            "category_ids": [category("Poke bowl")],
+            "components": [
+                {"type": "ingredient", "id": i, "quantity": q, "unit": u} for i, q, u in rows
+            ],
+        },
+    )["id"]
+
+
+def test_merging_moves_recipes_sections_and_favorites_and_deletes_it(conn, category, section, ingredient):
+    onion = ingredient("Onion", "Fresh Vegetables / Fruits")
+    ceapa = ingredient("Ceapă", "Topping")
+    rice = ingredient("Rice", "Base")
+    bowl = recipe(conn, category, "Rice bowl", [(rice, 150, "g"), (ceapa, 1, "pcs")])
+    favorites.set(conn, {"type": "ingredient", "id": ceapa}, "her", True)
+
+    merged = ingredients.merge(conn, ceapa, onion, {})
+
+    assert merged == {
+        "id": onion,
+        "name": "Onion",
+        "section_ids": [section("Fresh Vegetables / Fruits"), section("Topping")],
+    }
+    assert components(conn, bowl) == [("Rice", 150, "g"), ("Onion", 1, "pcs")]
+    assert [(i["name"], i["favorites"]) for i in ingredients.list_all(conn)] == [
+        ("Onion", ["her"]),
+        ("Rice", []),
+    ]
+
+
+def test_a_recipe_with_both_keeps_only_the_others_row(conn, category, ingredient):
+    onion = ingredient("Onion")
+    ceapa = ingredient("Ceapă")
+    rice = ingredient("Rice", "Base")
+    bowl = recipe(conn, category, "Rice bowl", [(ceapa, 2, "pcs"), (rice, 150, "g"), (onion, 30, "g")])
+
+    ingredients.merge(conn, ceapa, onion, {})
+
+    assert components(conn, bowl) == [("Rice", 150, "g"), ("Onion", 30, "g")]
+
+
+def test_a_favorite_on_both_by_the_same_person_ends_up_as_one(conn, ingredient):
+    onion = ingredient("Onion")
+    ceapa = ingredient("Ceapă")
+    for item, person in [(onion, "me"), (ceapa, "me"), (ceapa, "her")]:
+        favorites.set(conn, {"type": "ingredient", "id": item}, person, True)
+
+    ingredients.merge(conn, ceapa, onion, {})
+
+    assert [i["favorites"] for i in ingredients.list_all(conn)] == [["me", "her"]]
+
+
+def test_the_other_keeps_its_name_and_last_unit(conn, category, ingredient):
+    onion = ingredient("Onion")
+    ceapa = ingredient("Ceapă")
+    recipe(conn, category, "Onion bowl", [(onion, 30, "g")])
+    recipe(conn, category, "Ceapă bowl", [(ceapa, 2, "pcs")])
+
+    ingredients.merge(conn, ceapa, onion, {})
+
+    assert [(i["name"], i["last_unit"]) for i in ingredients.list_all(conn)] == [("Onion", "g")]
+
+
+def test_section_ticks_sent_with_the_merge_are_applied_first(conn, section, ingredient):
+    onion = ingredient("Onion", "Base")
+    ceapa = ingredient("Ceapă", "Topping")
+    ingredients.change(conn, ceapa, {"add_section_ids": [section("Base")]})
+
+    # Ticked Extras, unticked Topping and Base: only ever adds to Onion.
+    merged = ingredients.merge(
+        conn,
+        ceapa,
+        onion,
+        {"add_section_ids": [section("Extras")], "remove_section_ids": [section("Topping"), section("Base")]},
+    )
+
+    assert merged["section_ids"] == [section("Base"), section("Extras")]
+
+
+def test_renaming_to_its_own_same_name_is_a_plain_rename(conn, ingredient):
+    ceapa = ingredient("Ceapă")
+
+    assert ingredients.change(conn, ceapa, {"name": "ceapa"})["name"] == "Ceapa"
+
+
+def test_a_merge_that_fails_halfway_leaves_both_as_they_were(conn, category, section, ingredient):
+    onion = ingredient("Onion")
+    ceapa = ingredient("Ceapă", "Topping")
+    bowl = recipe(conn, category, "Ceapă bowl", [(ceapa, 2, "pcs")])
+    favorites.set(conn, {"type": "ingredient", "id": ceapa}, "me", True)
+    before = ingredients.list_all(conn)
+    # The database refuses the last step, deleting Ceapă.
+    conn.execute(
+        "CREATE TRIGGER refuse BEFORE DELETE ON ingredients BEGIN SELECT RAISE(ABORT, 'refused'); END"
+    )
+
+    with pytest.raises(Exception):
+        ingredients.merge(conn, ceapa, onion, {"add_section_ids": [section("Extras")]})
+
+    assert ingredients.list_all(conn) == before
+    assert components(conn, bowl) == [("Ceapă", 2, "pcs")]
+
+
+def test_an_ingredient_cannot_be_merged_into_itself_or_a_missing_one(conn, ingredient):
+    ceapa = ingredient("Ceapă")
+
+    for into, kind in [(ceapa, INVALID), (42, NOT_FOUND)]:
+        with pytest.raises(RuleError) as err:
+            ingredients.merge(conn, ceapa, into, {})
+        assert err.value.kind == kind
+    assert ingredients.get(conn, ceapa)["name"] == "Ceapă"

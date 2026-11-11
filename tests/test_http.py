@@ -174,3 +174,18 @@ def test_a_backup_downloads_the_whole_database_as_a_file(client, tmp_path):
     conn = db.get_connection(saved)
     assert db.version(conn) == len(db.migrations())
     assert [r[0] for r in conn.execute("SELECT name FROM stations ORDER BY id")] == ["Poke", "Burger"]
+
+
+def test_an_ingredient_can_be_merged_into_another_over_http(client):
+    onion = client.post("/api/ingredients", json={"name": "Onion", "section_ids": [1]}).json["ingredient"]
+    ceapa = client.post("/api/ingredients", json={"name": "Ceapă"}).json["ingredient"]
+
+    merged = client.post(
+        f"/api/ingredients/{ceapa['id']}/merge", json={"into": onion["id"], "add_section_ids": [2]}
+    )
+    assert (merged.status_code, merged.json) == (200, {"id": onion["id"], "name": "Onion", "section_ids": [1, 2]})
+    assert client.get("/api/ingredients").json["ingredients"][0]["name"] == "Onion"
+    assert len(client.get("/api/ingredients").json["ingredients"]) == 1
+
+    missing = client.post(f"/api/ingredients/{ceapa['id']}/merge", json={"into": onion["id"]})
+    assert missing.status_code == 404
