@@ -11,7 +11,7 @@ A base item in the catalog, such as salmon or rice. It is never a recipe: a sauc
 _Avoid_: item (that also covers listed recipes)
 
 **Same name**:
-Two names are the same when they differ only in case, accents or extra spaces: *branza* is *Brânză*, *Spring  onion* is *Spring onion*. Ingredient, station and recipe category names are unique this way, and so are section names within a station. The name kept is the one typed first.
+Two names are the same when they differ only in case, accents or extra spaces: *branza* is *Brânză*, *Spring  onion* is *Spring onion*. Ingredient, station and recipe category names are unique this way, and so are section names within a station. The name kept is the one typed first. Every name is saved with its first letter capitalised; the rest is kept as typed.
 _Avoid_: duplicate name, equal name
 
 **Item**:
