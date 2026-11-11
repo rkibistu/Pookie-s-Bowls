@@ -194,7 +194,7 @@ async function save() {
     name,
     section_ids: sectionIds,
   });
-  if (!reused) return;
+  if (!reused) return true;
   const places = added_to.map(sectionLabel).filter(Boolean);
   showToast(
     places.length
