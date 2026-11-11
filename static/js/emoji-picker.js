@@ -11,8 +11,9 @@ export const EMOJI_GROUPS = [
   ["Vegetables", "🥑 🥦 🥬 🥒 🌶️ 🫑 🌽 🥕 🧅 🧄 🥔 🍠 🍅 🍆 🫛 🫘 🥜 🍄 🌿 🫚"],
   ["Fruit", "🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥥 🥝"],
   ["Bread, dairy & sweet", "🍞 🥐 🥖 🥯 🧀 🧈 🥛 🍦 🍰 🧁 🍪 🍫 🍯 🍮"],
-  ["Drinks", "☕ 🍵 🧃 🥤 🧋 🍹 🍷 🍺 🥂"],
-  ["Kitchen", "🥫 🧂 🫙 🍴 🔪 🥢 🔥 ❄️ ⭐ ✨ 💜 💚"],
+  ["Snacks & drinks", "🍿 🥨 🍘 🍡 🍢 🍥 🥠 🍩 🍬 🍭 🥧 🧆 ☕ 🍵 🧃 🥤 🧋 🍹 🍷 🍺 🥂"],
+  ["Kitchen", "🥫 🧂 🫙 🍴 🔪 🥢 🔥 ❄️ 🧊 🥶 ⛄ 🍧 🍨 ⭐ ✨ 💜 💚"],
+  ["Cultures", "🌍 🌎 🌏 🏮 🎎 🗾 🌺 🇯🇵 🇰🇷 🇨🇳 🇹🇭 🇻🇳 🇮🇳 🇲🇽 🇺🇸 🇮🇹 🇫🇷 🇪🇸 🇬🇷 🇹🇷"],
 ].map(([heading, emoji]) => [heading, emoji.split(" ")]);
 
 let open = null; // {input, panel} while a panel is shown
