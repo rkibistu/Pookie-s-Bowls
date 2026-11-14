@@ -1,6 +1,6 @@
 # Reach the app from outside home, with Cloudflare
 
-Status: ready-for-human
+Status: done
 
 Blocked by: 02
 
@@ -25,3 +25,7 @@ See `../spec.md` and ADR 0003. Not now: pick this up once prod is stable and we 
 
 - On the server (by hand): install cloudflared as a system service, add this app's hostname on the tunnel, and put an Access application with the two emails in front of it.
 - Then, in the app: read the email Access passes along and map it to me/her (a prod setting, read from the server's `.env`, e.g. one variable per person), with the browser's switch as the fallback when there's no email.
+
+## Comments
+
+- 2026-11-14: Tunnel and Access app set up by hand. App side done: `current_person()` in `app.py` reads `Cf-Access-Authenticated-User-Email` and matches it (case-insensitive) to `ME_EMAIL` / `HER_EMAIL` from the server's `.env` (loaded by `docker-compose.prod.yml`, optional, git-ignored). A recognised email fixes the identity and the page has no Me/Her switch; no email or an unknown one keeps the switch (dev, or the home-network address). Still optional: bind the port to `127.0.0.1:5000:5000` so only the tunnel reaches the app (until then, the header could be faked from the home network).

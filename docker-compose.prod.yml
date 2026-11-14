@@ -16,5 +16,10 @@ services:
       - ./data:/data
     environment:
       - DB_PATH=/data/pookie.db
+    # ME_EMAIL / HER_EMAIL: whose Cloudflare Access email is whose. Lives only
+    # on the server, never committed (the repo is public). Optional.
+    env_file:
+      - path: .env
+        required: false
     # Comes back after a crash, `docker restart` or a reboot.
     restart: unless-stopped

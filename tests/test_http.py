@@ -189,3 +189,30 @@ def test_an_ingredient_can_be_merged_into_another_over_http(client):
 
     missing = client.post(f"/api/ingredients/{ceapa['id']}/merge", json={"into": onion["id"]})
     assert missing.status_code == 404
+
+
+# ---- Who is using it (Cloudflare Access email, prod only) -----------------
+
+
+@pytest.fixture
+def our_emails(monkeypatch):
+    monkeypatch.setenv("ME_EMAIL", "me@example.com")
+    monkeypatch.setenv("HER_EMAIL", "her@example.com")
+
+
+def test_our_access_email_fixes_who_it_is_and_drops_the_switch(client, our_emails):
+    page = client.get("/", headers={"Cf-Access-Authenticated-User-Email": " Her@Example.com "}).text
+    assert 'data-identity="her" data-identity-fixed' in page
+    assert "identity-btn" not in page
+
+
+def test_without_an_access_email_the_switch_stays(client, our_emails):
+    page = client.get("/").text
+    assert "data-identity-fixed" not in page
+    assert page.count('class="identity-btn"') == 4  # Me and Her, in the header and the menu
+
+
+def test_an_unknown_email_falls_back_to_the_switch(client, our_emails):
+    page = client.get("/", headers={"Cf-Access-Authenticated-User-Email": "someone@else.com"}).text
+    assert "data-identity-fixed" not in page
+    assert "identity-btn" in page

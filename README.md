@@ -33,6 +33,17 @@ Prod runs on a laptop at home, from `docker-compose.prod.yml`: gunicorn, no debu
 
 It comes back by itself after a reboot or a crash. While the laptop is off, the app is simply not there.
 
+### Cloudflare Access (who is 💜 / 💚)
+
+Outside the home network the app is reached through Cloudflare Tunnel, with Cloudflare Access letting in only our two emails (set up in Cloudflare, see ADR 0003). To let the app tell who is who, create `.env` next to `docker-compose.prod.yml` on the prod laptop (never commit it):
+
+```
+ME_EMAIL=<my email>
+HER_EMAIL=<her email>
+```
+
+then `docker compose -f docker-compose.prod.yml up -d --build`. Opened through Cloudflare, the app then knows who you are and shows no Me/Her switch. Opened without an email (dev, or `http://<address>:5000` on the home network), the switch is there as before. The email header is only trustworthy through the tunnel; binding the port to `127.0.0.1:5000:5000` would make the tunnel the only way in.
+
 ### Deploy
 
 ```

@@ -30,9 +30,27 @@ def handle_rule_error(err):
     return jsonify(error=err.message), STATUS[err.kind]
 
 
+# Cloudflare Access (prod) passes the logged-in email in this header; the
+# server's .env says whose email is whose. Dev has neither (see ADR 0003).
+ACCESS_EMAIL_HEADER = "Cf-Access-Authenticated-User-Email"
+PERSON_EMAIL_VARS = {"me": "ME_EMAIL", "her": "HER_EMAIL"}
+
+
+def current_person():
+    """"me" or "her" from the Access email, or None (no email, or not one of
+    ours): then the browser's me/her switch decides."""
+    email = request.headers.get(ACCESS_EMAIL_HEADER, "").strip().lower()
+    if not email:
+        return None
+    for person, var in PERSON_EMAIL_VARS.items():
+        if os.environ.get(var, "").strip().lower() == email:
+            return person
+    return None
+
+
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", person=current_person())
 
 
 @app.get("/backup")

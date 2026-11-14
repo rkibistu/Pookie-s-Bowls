@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-identity="me">
+<html lang="en" {% if person %}data-identity="{{ person }}" data-identity-fixed{% else %}data-identity="me"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,10 +14,13 @@
         </div>
         <span class="page-title" id="page-title"></span>
 
+        {# Known from the Access email (prod): no switch. #}
+        {% if not person %}
         <div class="identity-toggle" role="group" aria-label="Who are you?">
             <button type="button" class="identity-btn" data-who="me">😎 Me</button>
             <button type="button" class="identity-btn" data-who="her">🌸 Her</button>
         </div>
+        {% endif %}
     </header>
 
     <!-- Phones: the nav is a side menu, opened with ☰. -->
@@ -41,10 +44,12 @@
         <button type="button" class="nav-btn nav-add" id="new-station-btn"
                 title="New station" aria-label="New station">＋<span class="nav-add-label"> New station</span></button>
         <!-- Phones: Me/Her lives at the bottom of the menu instead of the header. -->
+        {% if not person %}
         <div class="identity-toggle menu-identity" role="group" aria-label="Who are you?">
             <button type="button" class="identity-btn" data-who="me">😎 Me</button>
             <button type="button" class="identity-btn" data-who="her">🌸 Her</button>
         </div>
+        {% endif %}
     </nav>
 
     <main class="app-main">

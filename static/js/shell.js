@@ -1,6 +1,8 @@
 // The app shell: who is using it (identity → color theme), which view is
 // shown, and on phones the side menu holding the nav. Identity and view
-// survive reloads in localStorage (per device).
+// survive reloads in localStorage (per device). In prod the server knows who
+// it is from the Cloudflare Access email: the page comes with the identity
+// fixed (data-identity-fixed) and no switch.
 
 const IDENTITY_KEY = "pookie-identity"; // "me" | "her"
 const VIEW_KEY = "pookie-view"; // "station" | "recipes" | "all"
@@ -18,11 +20,17 @@ export function onIdentityChange(listener) {
 /** Apply the chosen identity: drives the color theme and button state. */
 function setIdentity(who) {
   document.documentElement.dataset.identity = who;
-  localStorage.setItem(IDENTITY_KEY, who);
+  // A fixed identity isn't saved: the device keeps its own choice for the switch.
+  if (!identityIsFixed()) localStorage.setItem(IDENTITY_KEY, who);
   document.querySelectorAll(".identity-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.who === who);
   });
   identityListeners.forEach((listener) => listener());
+}
+
+/** True when the server set the identity from the Access email (prod). */
+function identityIsFixed() {
+  return "identityFixed" in document.documentElement.dataset;
 }
 
 export function currentIdentity() {
@@ -77,7 +85,7 @@ export function currentView() {
 /** Restore the saved identity (default: "me") and view, and wire their buttons.
  * Station buttons come and go with the stations; station.js draws them. */
 export function initShell() {
-  setIdentity(localStorage.getItem(IDENTITY_KEY) || "me");
+  setIdentity(identityIsFixed() ? currentIdentity() : localStorage.getItem(IDENTITY_KEY) || "me");
   document.querySelectorAll(".identity-btn").forEach((btn) => {
     btn.addEventListener("click", () => setIdentity(btn.dataset.who));
   });

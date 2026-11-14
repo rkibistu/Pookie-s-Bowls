@@ -1,6 +1,6 @@
 # Prod: using the app for real
 
-Status: ready-for-agent
+Status: done
 
 We start using the app for real, the two of us, from a second laptop running at home. From now on the prod database holds data we care about: every schema change must carry the existing data forward.
 
